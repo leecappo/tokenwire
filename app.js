@@ -137,6 +137,72 @@ function fallbackBg(selector) {
 }
 
 const LIVE = [];
+const PROXY_CANDIDATES = [
+  (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
+  (u) => `https://r.jina.ai/http://www.reddit.com${new URL(u).pathname}`
+];
+function safeJSON(res) {
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return null;
+  try { return res.clone().json(); } catch { return null; }
+}
+async function fetchFeed() {
+  const sources = [
+    'https://www.reddit.com/r/CryptoCurrency/new.json?limit=20',
+    'https://www.reddit.com/r/solana/new.json?limit=10',
+    'https://www.reddit.com/r/Bitcoin/new.json?limit=10'
+  ];
+  let items = [];
+  for (const url of sources) {
+    let data = null;
+    for (const build of PROXY_CANDIDATES) {
+      try {
+        const proxied = build(url);
+        const res = await fetch(proxied, { headers: { 'Accept': 'application/json', 'User-Agent': 'TokenWire/1.0' } });
+        if (!res.ok) continue;
+        const json = await safeJSON(res);
+        if (json && Array.isArray(json?.data?.children)) { data = json; break; }
+        const txt = await res.text().catch(() => '');
+        const m = txt && txt.match(/\{[\s\S]*\}/);
+        const parsed = m ? JSON.parse(m[0]) : null;
+        if (parsed && Array.isArray(parsed?.data?.children)) { data = parsed; break; }
+      } catch { /* noop */ }
+    }
+    if (!data) continue;
+    const list = Array.isArray(data.data.children) ? data.data.children : [];
+    list.forEach(({ data: child }) => {
+      const title = child.title;
+      if (!title || child.stickied || child.over_18) return;
+      const tl = (title || '').toLowerCase();
+      const category =
+        /bitcoin|btc/i.test(tl) ? 'bitcoin' :
+        /ethereum|eth/i.test(tl) ? 'ethereum' :
+        /solana|sol /i.test(tl) ? 'solana' :
+        tl.includes('defi') || tl.includes('yield') || tl.includes('governance') ? 'defi' :
+        /regulation|cftc|sec|treasury|bills/i.test(tl) ? 'regulation' :
+        tl.includes('usdc') || tl.includes('stablecoin') || tl.includes('cross-border') || tl.includes('circle') ? 'payments' :
+        'crypto';
+      const time = new Date((child.created_utc || Date.now()/1000) * 1000);
+      const timeAgo = getTimeAgo(time);
+      items.push({
+        title,
+        excerpt: (child.selftext || child.title).slice(0, 220),
+        source: 'r/' + (child.subreddit || 'news'),
+        url: 'https://www.reddit.com' + (child.permalink || ''),
+        category,
+        tags: [category],
+        time: timeAgo,
+        image: child.thumbnail && /^https?:\/\//.test(child.thumbnail) ? child.thumbnail : '',
+        type: 'news'
+      });
+    });
+  }
+  const seen = new Set();
+  LIVE.length = 0;
+  items.forEach(n => { if (!seen.has(n.url)) { seen.add(n.url); LIVE.push(n); } });
+  if (!LIVE.length) return [...NEWS];
+  return LIVE;
+}
 function renderHero(item) {
   const img = document.getElementById('hero-img');
   const title = document.getElementById('hero-title');
@@ -219,23 +285,9 @@ function initTags() {
       e.preventDefault();
       document.querySelectorAll('[data-tag]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-
-      const f = btn.dataset.tag;
-      const base = f === 'all' ? NEWS : NEWS.filter(n => {
-        const matchCategory = n.category === f;
-        const matchTags = Array.isArray(n.tags) && n.tags.includes(f);
-        return matchCategory || matchTags;
-      });
-      const sorted = base.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-      renderHero(sorted[0] || base[0] || NEWS[0]);
-      renderTopStories(sorted);
-      renderLatest(sorted);
-      renderFeature(sorted);
-      const target = document.getElementById('topstories-section') || document.getElementById('latest-section');
-      if (target) {
-        const y = target.getBoundingClientRect().top + window.scrollY - 120;
-        window.scrollTo({ top: y, behavior: 'smooth' });
-      }
+      renderTrending();
+      renderInsights();
+      filter({ activeTag: btn.dataset.tag || 'all', q: document.getElementById('tw-search')?.value || '' });
     });
   });
 }
@@ -343,77 +395,20 @@ function initNewsletter() {
 }
 
 function initLiveNews() {
-  const live = document.getElementById('live-indicator');
   const ts = document.getElementById('live-ts');
-  const updateUI = (items) => {
+  const refresh = async () => {
+    const items = await fetchFeed();
     renderHero(items[0] || NEWS[0]);
     renderTopStories(items);
     renderLatest(items.filter(n => n.type !== 'feature'));
     renderFeature(items);
     if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-  const fetchFeed = async () => {
-    try {
-      const sources = [
-        'https://www.reddit.com/r/CryptoCurrency/new.json?limit=20',
-        'https://www.reddit.com/r/solana/new.json?limit=10',
-        'https://www.reddit.com/r/Bitcoin/new.json?limit=10'
-      ];
-      const entries = [];
-      for (const url of sources) {
-        const res = await fetch(url, { headers: { 'Accept': 'application/json', 'User-Agent': 'TokenWire/1.0' } });
-        if (!res.ok) continue;
-        const data = await res.json();
-        const list = Array.isArray(data?.data?.children) ? data.data.children : [];
-        list.forEach(({ data: child }) => {
-          const title = child.title;
-          if (!title || child.stickied || child.over_18) return;
-          const tl = (title || '').toLowerCase();
-          const category =
-            /bitcoin|btc/i.test(tl) ? 'bitcoin' :
-            /ethereum|eth/i.test(tl) ? 'ethereum' :
-            /solana|sol /i.test(tl) ? 'solana' :
-            tl.includes('defi') || tl.includes('yield') || tl.includes('governance') ? 'defi' :
-            /regulation|cftc|sec|treasury|bills/i.test(tl) ? 'regulation' :
-            tl.includes('usdc') || tl.includes('stablecoin') || tl.includes('cross-border') || tl.includes('circle') ? 'payments' :
-            'crypto';
-          const time = new Date((child.created_utc || Date.now()/1000) * 1000);
-          const timeAgo = getTimeAgo(time);
-          entries.push({
-            title,
-            excerpt: (child.selftext || child.title).slice(0, 220),
-            source: 'r/' + (child.subreddit || 'news'),
-            url: 'https://www.reddit.com' + (child.permalink || ''),
-            category,
-            tags: [category],
-            time: timeAgo,
-            image: child.thumbnail && /^https?:\/\//.test(child.thumbnail) ? child.thumbnail : '',
-            type: 'news'
-          });
-        });
-      }
-      const seen = new Set();
-      LIVE.length = 0;
-      entries.forEach(n => {
-        if (!seen.has(n.url)) { seen.add(n.url); LIVE.push(n); }
-      });
-      updateUI(LIVE.length ? LIVE : [...NEWS]);
-      if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch {
-      updateUI([...NEWS]);
-    }
-  };
-  fetchFeed();
-  setInterval(fetchFeed, 5 * 60 * 1000);
+  refresh();
+  setInterval(refresh, 5 * 60 * 1000);
 }
 
-function updateUIFromLive() {
-  const items = LIVE.length ? LIVE : [...NEWS];
-  renderHero(items[0] || NEWS[0]);
-  renderTopStories(items);
-  renderLatest(items);
-  renderFeature(items);
-}
+
 
 function getTimeAgo(date) {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -432,41 +427,12 @@ function initSearch() {
   const rootLatest = document.getElementById('latest');
   if (!input) return;
   const q = (v) => String(v || '').toLowerCase();
+  const apply = (term) => filter({ q: term });
   const filter = (term) => {
     document.querySelectorAll('[data-tag]').forEach(b => b.classList.remove('active'));
     if (clear) clear.style.display = term ? 'inline-flex' : 'none';
-    if (!term) {
-      if (document.querySelector('[data-tag="all"]')) document.querySelector('[data-tag="all"]').classList.add('active');
-      if (LIVE.length) {
-        renderHero(LIVE[0]);
-        renderTopStories(LIVE);
-        renderLatest(LIVE);
-        renderFeature(LIVE);
-      } else {
-        renderHero(NEWS[0]);
-        renderTopStories(NEWS);
-        renderLatest(NEWS);
-        renderFeature(NEWS);
-      }
-      rootLatest && (rootLatest.id = 'latest');
-      return;
-    }
-    const items = LIVE.length ? LIVE : [...NEWS];
-    const matched = items.filter(n => q(n.title).includes(term) || q(n.excerpt).includes(term) || q(n.source).includes(term));
-    const first = matched[0] || items[0];
-    renderHero(first);
-    renderTopStories(matched);
-    renderLatest(matched.filter(n => n.type !== 'feature'));
-    renderFeature(matched);
-    if (!matched.length && term) {
-      const empty = document.createElement('div');
-      empty.className = 'latest-list';
-      empty.id = 'latest';
-      empty.innerHTML = '<div class="muted" style="padding:40px;text-align:center">No articles match your search.</div>';
-      rootLatest && rootLatest.replaceWith(empty);
-    } else {
-      rootLatest && (rootLatest.id = 'latest');
-    }
+    apply(term || '');
+    if (!term) document.querySelector('[data-tag="all"]')?.classList.add('active');
   };
   let t;
   input.addEventListener('input', (e) => {
@@ -480,12 +446,59 @@ function initSearch() {
   }
 }
 
+function filter(state) {
+  const active = state?.activeTag || 'all';
+  const q = state?.q ? String(state.q).toLowerCase().trim() : '';
+  let base = active === 'all' ? [...NEWS] : NEWS.filter(n => n.category === active || (Array.isArray(n.tags) && n.tags.includes(active)));
+  if (q) base = base.filter(n => [n.title, n.excerpt, n.source].some(s => String(s || '').toLowerCase().includes(q)));
+  const sorted = base.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  const hero = sorted[0] || base[0] || NEWS[0];
+  renderHero(hero);
+  renderTopStories(sorted);
+  renderLatest(sorted.filter(n => n.type !== 'feature'));
+  renderFeature(sorted);
+  const target = document.getElementById('topstories-section') || document.getElementById('latest-section');
+  if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
+}
+function renderTrending() {
+  const root = document.getElementById('trending-list');
+  if (!root) return;
+  const list = [
+    { name: 'Bitcoin', price: "$61,400", change: "+1.42%" },
+    { name: 'Ethereum', price: "$1,660", change: "+0.87%" },
+    { name: 'Solana', price: "$81.07", change: "+0.69%" },
+    { name: 'Hyperliquid', price: "$22.40", change: "+3.18%" },
+    { name: 'Aave', price: "$92.30", change: "-0.45%" }
+  ];
+  root.innerHTML = list.map(n => `
+    <div class="trending-item">
+      <span class="trending-name">${esc(n.name)}</span>
+      <div>
+        <span class="trending-price">${n.price}</span>
+        <span class="trending-change ${n.change.startsWith('+') ? 'up' : 'down'}">${n.change}</span>
+      </div>
+    </div>
+  `).join('');
+}
+function renderInsights() {
+  const labels = [
+    'Expert Analysis',
+    'On-chain Insights',
+    'Regulation Watch',
+    'DeFi Deep Dive'
+  ];
+  const root = document.querySelector('.widget:nth-child(2) .about-text');
+  if (!root) return;
+  root.textContent = `TokenWire curates ${labels[Math.floor(Math.random()*labels.length)]} across protocol design, governance risk, and policy shifts.`;
+}
 function bootstrap() {
   try {
     renderHero(NEWS[0]);
     renderTopStories(NEWS);
     renderFeature(NEWS);
     renderLatest(NEWS);
+    renderTrending();
+    renderInsights();
     initTags();
     initTicker();
     initNewsletter();
@@ -501,3 +514,4 @@ function bootstrap() {
   }
 }
 bootstrap();
+</script>
