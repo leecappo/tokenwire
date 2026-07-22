@@ -481,15 +481,23 @@ function initSearch() {
 }
 
 function bootstrap() {
-  const heroItem = NEWS[0];
-  renderHero(heroItem);
-  renderTopStories(NEWS);
-  renderFeature(NEWS);
-  renderLatest(NEWS);
-  initTags();
-  initTicker();
-  initNewsletter();
-  initSearch();
-  initLiveNews();
+  try {
+    renderHero(NEWS[0]);
+    renderTopStories(NEWS);
+    renderFeature(NEWS);
+    renderLatest(NEWS);
+    initTags();
+    initTicker();
+    initNewsletter();
+    initSearch();
+    initLiveNews();
+  } catch (err) {
+    console.error('TokenWire bootstrap failed:', err);
+    const fallback = document.createElement('div');
+    fallback.className = 'container';
+    fallback.style.cssText = 'padding:30px;color:#ff8a8a;text-align:center;';
+    fallback.textContent = 'Loading failed. If it persists, open dev tools (F12) and send me the error.';
+    document.querySelector('main')?.insertAdjacentElement('afterbegin', fallback);
+  }
 }
 bootstrap();
