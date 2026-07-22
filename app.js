@@ -111,6 +111,39 @@ const NEWS = [
     img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80',
     type: 'news',
   },
+  {
+    title: 'SEC delays spot Ethereum ETF decision while fee wars intensify',
+    excerpt: 'Agency pushes back on approval timeline as issuers slash fees and crypto markets await clarity.',
+    source: 'Bloomberg',
+    url: 'https://bloomberg.com',
+    category: 'ethereum',
+    tags: ['ethereum'],
+    time: '24 hours ago',
+    img: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
+    type: 'news',
+  },
+  {
+    title: 'Bitcoin miners hold as halving revenue pressure shifts toward fee reliance',
+    excerpt: 'Hashrate stays near all-time highs while miners optimize operations and hedging strategies.',
+    source: 'CoinDesk',
+    url: 'https://coindesk.com',
+    category: 'bitcoin',
+    tags: ['bitcoin'],
+    time: '26 hours ago',
+    img: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80',
+    type: 'news',
+  },
+  {
+    title: 'Japan updates stablecoin and payments licensing framework for 2026',
+    excerpt: 'New rules clarify reserve requirements and cross-border settlement options for crypto payment providers.',
+    source: 'Nikkei Asia',
+    url: 'https://asia.nikkei.com',
+    category: 'payments',
+    tags: ['payments', 'regulation'],
+    time: '28 hours ago',
+    img: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
+    type: 'news',
+  },
 ];
 
 function esc(s) {
@@ -126,13 +159,23 @@ function fmtTime(t) { return t || 'recently'; }
 function resolveImage(n) {
   const raw = n.img || n.image || '';
   if (raw && /^https?:\/\//.test(raw)) return raw;
-  return '';
+  const map = {
+    bitcoin: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80',
+    ethereum: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
+    solana: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80',
+    defi: 'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80',
+    payments: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
+    regulation: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
+    crypto: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80'
+  };
+  const cat = (n.category || 'crypto').toLowerCase();
+  return map[cat] || map['crypto'];
 }
 function fallbackBg(selector) {
   document.querySelectorAll(selector).forEach(el => {
     const src = el.style.backgroundImage || '';
-    if (!src || src.includes('url(')) return;
-    el.style.backgroundImage = "linear-gradient(135deg, #1a1e34, #121525)";
+    if (src && src.includes('url(')) return;
+    el.style.backgroundImage = "url('https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80')";
   });
 }
 
@@ -292,6 +335,7 @@ function initTags() {
   });
 }
 
+let TICKER_CACHE = [];
 function initTicker() {
   const el = document.getElementById('ticker-top');
   if (!el) return;
@@ -306,6 +350,7 @@ function initTicker() {
         return `&nbsp;<span class="ticker-item">${x}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
       }).join('');
   };
+  renderTrending();
   const upd = async () => {
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h');
@@ -313,8 +358,15 @@ function initTicker() {
       const data = await res.json();
       const ticks = (Array.isArray(data) ? data : [])
         .filter(c => c.current_price != null)
-        .map(c => `${c.symbol.toUpperCase()} $${Number(c.current_price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`);
-      render(ticks);
+        .map(c => ({
+          symbol: c.symbol.toUpperCase(),
+          price: Number(c.current_price),
+          change: Number(c.price_change_percentage_24h || 0)
+        }));
+      TICKER_CACHE = ticks;
+      const ts = ticks.map(t => `${t.symbol} $${t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`);
+      render(ts);
+      renderTrending();
     } catch {
       render([
         'BTC $61,400', 'ETH $1,660', 'SOL $81.07', 'BNB $560.41',
