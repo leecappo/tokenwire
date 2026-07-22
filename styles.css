@@ -449,12 +449,13 @@ footer {
 }
 
 .list-thumb {
-  height: 56px;
-  width: 72px;
+  height: 58px;
+  width: 78px;
   border-radius: 10px;
+  background-image: linear-gradient(135deg, #1a1e34, #121525);
   background-size: cover;
   background-position: center;
-  background-image: linear-gradient(135deg, #1a1e34, #121525);
+  background-color: #121525;
 }
 
 .list-main {

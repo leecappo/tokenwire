@@ -124,9 +124,16 @@ function esc(s) {
 function fmtTime(t) { return t || 'recently'; }
 
 function resolveImage(n) {
-  const raw = n.img || '';
-  if (raw) return raw;
+  const raw = n.img || n.image || '';
+  if (raw && /^https?:\/\//.test(raw)) return raw;
   return '';
+}
+function fallbackBg(selector) {
+  document.querySelectorAll(selector).forEach(el => {
+    const src = el.style.backgroundImage || '';
+    if (!src || src.includes('url(')) return;
+    el.style.backgroundImage = "linear-gradient(135deg, #1a1e34, #121525)";
+  });
 }
 
 const LIVE = [];
