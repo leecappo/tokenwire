@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TokenWire — Crypto News</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0d14;
+      --panel: #12151f;
+      --panel-2: #181c28;
+      --border: #232838;
+      --muted: #7a82a6;
+      --text: #d6d9e6;
+      --accent: #14f195;
+      --accent-2: #9945ff;
+      --red: #ff4d6a;
+      --green: #14f195;
+      --warn: #f5a623;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial;
+      line-height: 1.55;
+    }
+
+    a {
+      color: #8ab4ff;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
+    header {
+      padding: 28px 0 18px;
+      border-bottom: 1px solid var(--border);
+      background:
+        radial-gradient(1200px 500px at 10% -20%, rgba(153, 69, 255, 0.25), transparent),
+        radial-gradient(1200px 500px at 90% -20%, rgba(20, 241, 149, 0.18), transparent);
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      color: #07110f;
+      border-radius: 10px;
+      font-weight: 900;
+    }
+
+    .brand h1 {
+      font-size: 1.7rem;
+      letter-spacing: -0.3px;
+      color: #f3f4ff;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      color: #0b0d14;
+      border: none;
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      color: #b8bbcd;
+      font-weight: 500;
+      font-size: 0.92rem;
+      text-decoration: none;
+    }
+
+    .nav-links a:hover {
+      color: #fff;
+      text-decoration: underline;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 14px 0 4px;
+    }
+
+    .tag {
+      color: #a8b4ff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+
+    .tag:hover {
+      text-decoration: underline;
+    }
+
+    .tag-divider {
+      color: var(--muted);
+      font-size: 0.8rem;
+      align-self: center;
+    }
+
+    /* Ticker */
+    .ticker-wrap {
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      padding: 10px 0;
+    }
+
+    .ticker {
+      white-space: nowrap;
+      animation: ticker 60s linear infinite;
+      color: #7ee787;
+      font-size: 0.9rem;
+    }
+    .ticker-dot { color: #3b82f6; }
+    .ticker-name { color: #3b82f6; font-weight: 700; }
+    .ticker-price { color: #7ee787; font-family: "JetBrains Mono", monospace; font-weight: 700; }
+
+    @keyframes ticker {
+      from { transform: translateX(100vw); }
+      to { transform: translateX(-100%); }
+    }
+
+    /* Hero featured */
+    .hero {
+      padding: 26px 0 6px;
+    }
+
+    .hero-card {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .hero-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 36px rgba(0,0,0,0.35);
+    }
+
+    .hero-img {
+      min-height: 300px;
+      background-image: linear-gradient(135deg, #1a1e34, #121525);
+      background-size: cover;
+      background-position: center;
+    }
+
+    .hero-text {
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .hero .badge {
+      display: inline-flex;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(153,69,255,0.18);
+      color: #d4bfff;
+      border: 1px solid rgba(153,69,255,0.35);
+      width: fit-content;
+    }
+
+    .hero h3 {
+      font-size: 1.55rem;
+      letter-spacing: -0.4px;
+      line-height: 1.25;
+      color: #fff;
+    }
+
+    .hero p {
+      color: #b8bbcd;
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
+
+    .hero .meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* Section header */
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding: 30px 0 10px;
+    }
+
+    .section-head h2 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #f3f4ff;
+    }
+
+    .section-head .muted {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    /* Top stories cards */
+    .topstories {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      padding-bottom: 18px;
+    }
+
+    .ts-card {
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+
+    .ts-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,0.16);
+    }
+
+    .ts-img {
+      height: 150px;
+      background-image: linear-gradient(135deg, #1a1e34, #121525);
+      background-size: cover;
+      background-position: center;
+    }
+
+    .ts-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ts-body .badge {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      width: fit-content;
+      background: rgba(20,241,149,0.12);
+      color: #93ffd3;
+      border: 1px solid rgba(20,241,149,0.28);
+    }
+
+    .ts-body h4 {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: #f3f4ff;
+      line-height: 1.35;
+    }
+
+    .ts-body .meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    /* Feature deep-dive */
+    .feature {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    .feature-img {
+      min-height: 220px;
+      background-image: linear-gradient(135deg, #1a1e34, #121525);
+      background-size: cover;
+      background-position: center;
+    }
+
+    .feature-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .feature-body h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .feature-body p {
+      color: #b8bbcd;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .feature-body .meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* Latest list */
+    .latest-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 22px;
+    }
+
+    .list-row {
+      display: grid;
+      grid-template-columns: 78px 1fr auto;
+      gap: 16px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      transition: border-color 0.15s ease;
+    }
+
+    .list-row:hover {
+      border-color: #2e344a;
+    }
+
+    .list-thumb {
+      height: 58px;
+      width: 78px;
+      border-radius: 10px;
+      background-image: linear-gradient(135deg, #1a1e34, #121525);
+      background-size: cover;
+      background-position: center;
+    }
+
+    .list-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .list-title {
+      font-weight: 700;
+      color: #f3f4ff;
+      font-size: 0.98rem;
+      line-height: 1.3;
+    }
+
+    .list-meta {
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0 60px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    footer .container > div:first-child {
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 980px) {
+      .hero-card { grid-template-columns: 1fr; }
+      .feature { grid-template-columns: 1fr; }
+      .topstories { grid-template-columns: 1fr; }
+      .list-row { grid-template-columns: 56px 1fr; }
+      .list-thumb { width: 56px; height: 56px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ticker-wrap" aria-label="market ticker">
+    <div class="ticker" id="ticker-top">Loading markets...</div>
+  </div>
+
+  <header id="top">
+    <div class="container">
+      <div class="topnav">
+        <a class="brand" href="index.html">
+          <div class="brand-icon" aria-hidden="true">TW</div>
+          <h1>TokenWire</h1>
+        </a>
+        <div class="actions">
+          <a class="btn" href="markets.html">Markets</a>
+        </div>
+      </div>
+      <div style="padding-top:10px; display:flex; justify-content:center;">
+        <div style="position:relative; width:min(420px, 80vw);">
+          <input id="tw-search" type="search" placeholder="Search articles..." autocomplete="off" class="tw-search" />
+          <button id="tw-search-clear" class="tw-search-clear" aria-label="Clear search" type="button">&times;</button>
+        </div>
+      </div>
+      <div class="nav-links" style="padding-top: 14px;">
+        <a href="#latest-section">Latest</a>
+        <a href="#topstories-section">Top Stories</a>
+        <a href="#features">Features</a>
+        <a href="markets.html">Markets</a>
+        <a href="#newsletter">Subscribe</a>
+      </div>
+      <div class="tag-row" data-tags>
+        <a class="tag active" href="#" data-tag="all">#All</a>
+        <span class="tag-divider">•</span>
+        <a class="tag" href="#" data-tag="bitcoin">#Bitcoin</a>
+        <a class="tag" href="#" data-tag="ethereum">#Ethereum</a>
+        <a class="tag" href="#" data-tag="solana">#Solana</a>
+        <a class="tag" href="#" data-tag="defi">#DeFi</a>
+        <a class="tag" href="#" data-tag="payments">#Payments</a>
+        <a class="tag" href="#" data-tag="regulation">#Regulation</a>
+        <span class="muted" id="live-indicator" style="margin-left:auto; font-size:0.8rem;">● Live <span id="live-ts"></span></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="hero">
+      <a class="hero-card" href="#" target="_blank" rel="noopener" id="hero-link">
+        <div class="hero-img" id="hero-img"></div>
+        <div class="hero-text">
+          <span class="badge" id="hero-badge"></span>
+          <h3 id="hero-title"></h3>
+          <p id="hero-excerpt"></p>
+          <span class="meta" id="hero-meta"></span>
+        </div>
+      </a>
+    </div>
+
+    <div id="topstories-section" class="section-head">
+      <h2>Top Stories</h2>
+    </div>
+    <div class="topstories" id="topstories"></div>
+
+    <div class="feature" id="features">
+      <div class="feature-img" id="feature-img"></div>
+      <div class="feature-body">
+        <span class="badge" id="feature-badge">Feature</span>
+        <h3 id="feature-title"></h3>
+        <p id="feature-excerpt"></p>
+        <a class="news-link" href="#" id="feature-link" target="_blank" rel="noopener">Read more →</a>
+        <span class="meta" id="feature-meta"></span>
+      </div>
+    </div>
+
+    <div id="latest-section" class="section-head">
+      <h2>Latest</h2>
+      <span class="muted" id="latest-count"></span>
+    </div>
+    <div class="latest-list" id="latest"></div>
+  </main>
+
+  <footer id="newsletter">
+    <div class="container">
+      TokenWire · News & analysis · Prices via CoinGecko
+      <div style="margin-top:18px; text-align:center;">
+        <form id="tw-newsletter" style="max-width:420px; margin: 0 auto; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center;">
+          <input id="tw-email" type="email" placeholder="you@email.com" required style="flex:1 1 180px; background:#0e1118; border:1px solid var(--border); color:var(--text); padding:10px 12px; border-radius:12px; outline:none;" />
+          <button type="submit" style="padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:linear-gradient(135deg,#14f195,#9945ff); color:#fff; font-weight:700; cursor:pointer;">Join</button>
+        </form>
+        <a class="btn" href="https://tokenwire-news.beehiiv.com/subscribe" target="_blank" rel="noopener" style="margin-top:10px; display:inline-flex; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:transparent; color:var(--text); text-decoration:none;">Subscribe on Beehiiv →</a>
+        <p class="muted" style="margin-top:8px; font-size:0.8rem">Daily brief · No spam · Unsubscribe anytime</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="./app.js"></script>
+</body>
+</html>
