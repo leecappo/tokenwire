@@ -514,4 +514,3 @@ function bootstrap() {
   }
 }
 bootstrap();
-</script>
