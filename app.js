@@ -338,19 +338,13 @@ function initNewsletter() {
 function initLiveNews() {
   const live = document.getElementById('live-indicator');
   const ts = document.getElementById('live-ts');
-  const fallback = [...NEWS];
   const updateUI = (items) => {
-    const prev = NEWS.slice();
-    if (items.length) {
-      items.forEach((n, i) => { if (i < NEWS.length) Object.assign(NEWS[i], n); });
-    }
-    renderHero(NEWS[0]);
-    renderTopStories(NEWS);
-    renderLatest(NEWS);
-    renderFeature(NEWS);
+    renderHero(items[0] || NEWS[0]);
+    renderTopStories(items);
+    renderLatest(items.filter(n => n.type !== 'feature'));
+    renderFeature(items);
     if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
-  const LIVE = [];
   const fetchFeed = async () => {
     try {
       const sources = [
@@ -396,10 +390,10 @@ function initLiveNews() {
       entries.forEach(n => {
         if (!seen.has(n.url)) { seen.add(n.url); LIVE.push(n); }
       });
-      updateUIFromLive();
+      updateUI(LIVE.length ? LIVE : [...NEWS]);
       if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
-      updateUIFromLive();
+      updateUI([...NEWS]);
     }
   };
   fetchFeed();
