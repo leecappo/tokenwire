@@ -90,30 +90,8 @@ const NEWS = [
     type: 'news',
   },
   {
-    title: 'Aave v4 roadmap expands to Bitcoin and Ethereum as unified liquidity layer',
-    excerpt: 'The next Aave version aims to support cross-chain borrowing across multiple networks.',
-    source: 'Aave',
-    url: 'https://aave.com',
-    category: 'defi',
-    tags: ['ethereum', 'defi'],
-    time: '20 hours ago',
-    img: 'https://images.unsplash.com/photo-1621416894569-0f39ed31d247?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Hyperliquid surpasses $5B USDC bridging amid derivatives surge on Solana',
-    excerpt: 'Perpetual trading and institutional interest are pushing more collateral onto Solana-based venues.',
-    source: 'CryptoSlate',
-    url: 'https://cryptoslate.com',
-    category: 'defi',
-    tags: ['solana', 'defi'],
-    time: '20 hours ago',
-    img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80',
-    type: 'news',
-  },
-  {
     title: 'SEC delays spot Ethereum ETF decision while fee wars intensify',
-    excerpt: 'Agency pushes back on approval timeline as issuers slash fees and crypto markets await clarity.',
+    excerpt: 'The regulator postponed its ruling again, while issuers cut fees in anticipation of a crowded ETF market.',
     source: 'Bloomberg',
     url: 'https://bloomberg.com',
     category: 'ethereum',
@@ -124,7 +102,7 @@ const NEWS = [
   },
   {
     title: 'Bitcoin miners hold as halving revenue pressure shifts toward fee reliance',
-    excerpt: 'Hashrate stays near all-time highs while miners optimize operations and hedging strategies.',
+    excerpt: 'Hashrate remains stable despite compressed margins, suggesting miner confidence in longer-term fee-based revenue.',
     source: 'CoinDesk',
     url: 'https://coindesk.com',
     category: 'bitcoin',
@@ -135,7 +113,7 @@ const NEWS = [
   },
   {
     title: 'Japan updates stablecoin and payments licensing framework for 2026',
-    excerpt: 'New rules clarify reserve requirements and cross-border settlement options for crypto payment providers.',
+    excerpt: 'New rules clarify issuer requirements and custodial arrangements for yen-backed stablecoins.',
     source: 'Nikkei Asia',
     url: 'https://asia.nikkei.com',
     category: 'payments',
@@ -146,10 +124,23 @@ const NEWS = [
   },
 ];
 
+const CATEGORY_LABELS = {
+  all: 'All',
+  bitcoin: 'Bitcoin',
+  ethereum: 'Ethereum',
+  solana: 'Solana',
+  defi: 'DeFi',
+  payments: 'Payments',
+  regulation: 'Regulation',
+  crypto: 'Crypto',
+};
+
 let activeTag = 'all';
 let activeQuery = '';
+let liveCache = [];
 
-const CRYPTOCOMPARE_NEWS_URL = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
+const CRYPTOCOMPARE_NEWS_URL =
+  'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
 const NEWS_PROXY = 'https://api.allorigins.win/get?url=';
 const RSS_LIVE_FEED =
   'https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss&count=12';
@@ -226,6 +217,7 @@ function showLoadingSpinner() {
     document.getElementById('feature-meta').textContent = '';
   }
 }
+
 function showError(message) {
   const container = document.getElementById('latest');
   if (container)
@@ -325,7 +317,7 @@ function renderLatest(items) {
           <span class="list-meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
         </div>
         <span class="badge">${esc(n.category)}</span>
-        ${n.sourceLabel ? `<span class=\"source-badge\">${esc(n.sourceLabel)}</span>` : ''}
+        ${n.sourceLabel ? `<span class="source-badge">${esc(n.sourceLabel)}</span>` : ''}
       </a>`
     )
     .join('');
@@ -523,6 +515,7 @@ async function fetchLiveCryptoNews() {
 
 async function refreshLiveNews() {
   const items = await fetchLiveCryptoNews();
+  liveCache = items;
   const ts = document.getElementById('live-ts');
   if (ts) ts.dataset.fallback = '0';
   renderFiltered(items);
@@ -530,6 +523,7 @@ async function refreshLiveNews() {
 }
 
 function showLiveError(message) {
+  liveCache = [];
   const fallback = [...NEWS];
   renderFiltered(fallback);
   setLastUpdated();
@@ -557,8 +551,8 @@ function filter(state) {
   activeQuery = q;
   document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
   document.querySelector(`[data-tag="${active}"]`)?.classList.add('active');
-  // Render from cached live collection best-effort, else curated feed only
-  renderFiltered(LIVE.length ? LIVE : NEWS);
+  const items = liveCache.length ? liveCache : NEWS;
+  renderFiltered(items);
 }
 
 function initSearch() {
@@ -589,16 +583,28 @@ function initSearch() {
   }
 }
 
+function initNavLinks() {
+  document.querySelectorAll('.nav-links a[href^="#"]').forEach((link) => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      const href = link.getAttribute('href');
+      if (!href || href === '#') return;
+      const target = document.querySelector(href);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+}
+
 function renderTrending() {
   const root = document.getElementById('trending-list');
   if (!root) return;
-  const list = [
-    { name: 'Bitcoin', price: '$61,400', change: '+1.42%' },
-    { name: 'Ethereum', price: '$1,660', change: '+0.87%' },
-    { name: 'Solana', price: '$81.07', change: '+0.69%' },
-    { name: 'Hyperliquid', price: '$22.40', change: '+3.18%' },
-    { name: 'Aave', price: '$92.30', change: '-0.45%' },
-  ];
+  const list = TICKER_CACHE.slice(0, 5).map((x) => ({
+    name: x.symbol,
+    price: `$${x.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`,
+    change: `${x.change >= 0 ? '+' : ''}${x.change.toFixed(2)}%`,
+  }));
   root.innerHTML = list
     .map(
       (n) =>
@@ -612,6 +618,7 @@ function renderTrending() {
     )
     .join('');
 }
+
 function renderInsights() {
   const labels = [
     'Expert Analysis',
@@ -624,7 +631,6 @@ function renderInsights() {
   root.textContent = `TokenWire curates ${labels[Math.floor(Math.random() * labels.length)]} across protocol design, governance risk, and policy shifts.`;
 }
 
-const LIVE = [];
 async function bootstrap() {
   try {
     renderHero(NEWS[0]);
@@ -637,6 +643,7 @@ async function bootstrap() {
     initTicker();
     initNewsletter();
     initSearch();
+    initNavLinks();
     bootstrapLiveNews();
     setInterval(bootstrapLiveNews, 60 * 60 * 1000);
   } catch (err) {
