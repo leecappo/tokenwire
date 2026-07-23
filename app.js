@@ -189,62 +189,68 @@ function safeJSON(res) {
   if (!ct.includes('application/json')) return null;
   try { return res.clone().json(); } catch { return null; }
 }
+async function tryJSON(url) {
+  for (const build of PROXY_CANDIDATES) {
+    try {
+      const proxied = build(url);
+      const res = await fetch(proxied, { headers: { 'Accept': 'application/json', 'User-Agent': 'TokenWire/1.0' } });
+      if (!res.ok) continue;
+      const json = await safeJSON(res);
+      if (json && Array.isArray(json?.data?.children)) return json;
+      const txt = await res.text().catch(() => '');
+      const m = txt && txt.match(/\{[\s\S]*\}/);
+      const parsed = m ? JSON.parse(m[0]) : null;
+      if (parsed && Array.isArray(parsed?.data?.children)) return parsed;
+    } catch { /* noop */ }
+  }
+  return null;
+}
 async function fetchFeed() {
   const sources = [
     'https://www.reddit.com/r/CryptoCurrency/new.json?limit=20',
     'https://www.reddit.com/r/solana/new.json?limit=10',
     'https://www.reddit.com/r/Bitcoin/new.json?limit=10'
   ];
-  let items = [];
-  for (const url of sources) {
-    let data = null;
-    for (const build of PROXY_CANDIDATES) {
-      try {
-        const proxied = build(url);
-        const res = await fetch(proxied, { headers: { 'Accept': 'application/json', 'User-Agent': 'TokenWire/1.0' } });
-        if (!res.ok) continue;
-        const json = await safeJSON(res);
-        if (json && Array.isArray(json?.data?.children)) { data = json; break; }
-        const txt = await res.text().catch(() => '');
-        const m = txt && txt.match(/\{[\s\S]*\}/);
-        const parsed = m ? JSON.parse(m[0]) : null;
-        if (parsed && Array.isArray(parsed?.data?.children)) { data = parsed; break; }
-      } catch { /* noop */ }
-    }
-    if (!data) continue;
-    const list = Array.isArray(data.data.children) ? data.data.children : [];
-    list.forEach(({ data: child }) => {
+  const batches = await Promise.allSettled(sources.map(tryJSON));
+  const items = [];
+  const seen = new Set();
+  for (const row of batches) {
+    if (row.status !== 'fulfilled' || !row.value) continue;
+    const list = Array.isArray(row.value.data.children) ? row.value.data.children : [];
+    for (const { data: child } of list) {
       const title = child.title;
-      if (!title || child.stickied || child.over_18) return;
+      if (!title || child.stickied || child.over_18) continue;
       const tl = (title || '').toLowerCase();
       const category =
         /bitcoin|btc/i.test(tl) ? 'bitcoin' :
         /ethereum|eth/i.test(tl) ? 'ethereum' :
-        /solana|sol /i.test(tl) ? 'solana' :
+        /solana/i.test(tl) ? 'solana' :
         tl.includes('defi') || tl.includes('yield') || tl.includes('governance') ? 'defi' :
         /regulation|cftc|sec|treasury|bills/i.test(tl) ? 'regulation' :
         tl.includes('usdc') || tl.includes('stablecoin') || tl.includes('cross-border') || tl.includes('circle') ? 'payments' :
         'crypto';
       const time = new Date((child.created_utc || Date.now()/1000) * 1000);
       const timeAgo = getTimeAgo(time);
+      const url = 'https://www.reddit.com' + (child.permalink || '');
+      if (seen.has(url)) continue;
+      seen.add(url);
       items.push({
         title,
         excerpt: (child.selftext || child.title).slice(0, 220),
         source: 'r/' + (child.subreddit || 'news'),
-        url: 'https://www.reddit.com' + (child.permalink || ''),
+        url,
         category,
         tags: [category],
         time: timeAgo,
         image: child.thumbnail && /^https?:\/\//.test(child.thumbnail) ? child.thumbnail : '',
         type: 'news'
       });
-    });
+    }
   }
-  const seen = new Set();
   LIVE.length = 0;
-  items.forEach(n => { if (!seen.has(n.url)) { seen.add(n.url); LIVE.push(n); } });
-  if (!LIVE.length) return [...NEWS];
-  return LIVE;
+  items.forEach(n => LIVE.push(n));
+  if (LIVE.length) return LIVE;
+  return [...NEWS];
 }
 function renderHero(item) {
   const img = document.getElementById('hero-img');
