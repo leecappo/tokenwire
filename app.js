@@ -334,9 +334,9 @@ function initTags() {
       e.preventDefault();
       document.querySelectorAll('[data-tag]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderTrending();
-      renderInsights();
-      filter({ activeTag: btn.dataset.tag || 'all', q: document.getElementById('tw-search')?.value || '' });
+      const tag = btn.dataset.tag || 'all';
+      const q = document.getElementById('tw-search')?.value || '';
+      filter({ activeTag: tag, q });
     });
   });
 }
