@@ -146,6 +146,11 @@ const NEWS = [
   },
 ];
 
+let activeTag = 'all';
+let activeQuery = '';
+
+const CRYPTOCOMPARE_NEWS_URL = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
+
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -166,92 +171,64 @@ function resolveImage(n) {
     defi: 'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80',
     payments: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
     regulation: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
-    crypto: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80'
+    crypto: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80',
   };
   const cat = (n.category || 'crypto').toLowerCase();
   return map[cat] || map['crypto'];
 }
-function fallbackBg(selector) {
-  document.querySelectorAll(selector).forEach(el => {
-    const src = el.style.backgroundImage || '';
-    if (src && src.includes('url(')) return;
-    el.style.backgroundImage = "url('https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80')";
-  });
+
+function categoryForNode(node) {
+  const body = [node.title, node.body || '', node.tags ? node.tags.join(' ') : ''].join(' ').toLowerCase();
+  if (/bitcoin|btc/i.test(body)) return 'bitcoin';
+  if (/ethereum|eth/i.test(body)) return 'ethereum';
+  if (/solana|sol/i.test(body)) return 'solana';
+  if (/defi|yield|governance|lending|liquidity|dex/i.test(body)) return 'defi';
+  if (/regulation|sec|cftc|treasury|law|compliance/i.test(body)) return 'regulation';
+  if (/stablecoin|usdc|usdt|payments|cross-border/i.test(body)) return 'payments';
+  return 'crypto';
 }
 
-const LIVE = [];
-const PROXY_CANDIDATES = [
-  (u) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`,
-  (u) => `https://r.jina.ai/http://www.reddit.com${new URL(u).pathname}`
-];
-function safeJSON(res) {
-  const ct = res.headers.get('content-type') || '';
-  if (!ct.includes('application/json')) return null;
-  try { return res.clone().json(); } catch { return null; }
+function normalizeNewsItem(node) {
+  const category = categoryForNode(node);
+  return {
+    title: node.title || 'Untitled',
+    excerpt: (node.body || node.title || '').slice(0, 220),
+    source: node.source || 'CryptoCompare',
+    url: node.url || '#',
+    category,
+    tags: [category],
+    time: 'recently',
+    img: node.imageurl || '',
+    type: 'news',
+  };
 }
-async function tryJSON(url) {
-  for (const build of PROXY_CANDIDATES) {
-    try {
-      const proxied = build(url);
-      const res = await fetch(proxied, { headers: { 'Accept': 'application/json', 'User-Agent': 'TokenWire/1.0' } });
-      if (!res.ok) continue;
-      const json = await safeJSON(res);
-      if (json && Array.isArray(json?.data?.children)) return json;
-      const txt = await res.text().catch(() => '');
-      const m = txt && txt.match(/\{[\s\S]*\}/);
-      const parsed = m ? JSON.parse(m[0]) : null;
-      if (parsed && Array.isArray(parsed?.data?.children)) return parsed;
-    } catch { /* noop */ }
+
+function showLoadingSpinner() {
+  const container = document.getElementById('latest');
+  const topstories = document.getElementById('topstories');
+  const heroLink = document.getElementById('hero-link');
+  const feature = document.getElementById('features');
+  if (container)
+    container.innerHTML =
+      '<div class="news-loading">Loading TokenWire feed...</div>';
+  if (topstories) topstories.innerHTML = '';
+  if (heroLink) {
+    document.getElementById('hero-title').textContent = '';
+    document.getElementById('hero-excerpt').textContent = '';
+    document.getElementById('hero-meta').textContent = '';
   }
-  return null;
-}
-async function fetchFeed() {
-  const sources = [
-    'https://www.reddit.com/r/CryptoCurrency/new.json?limit=20',
-    'https://www.reddit.com/r/solana/new.json?limit=10',
-    'https://www.reddit.com/r/Bitcoin/new.json?limit=10'
-  ];
-  const batches = await Promise.allSettled(sources.map(tryJSON));
-  const items = [];
-  const seen = new Set();
-  for (const row of batches) {
-    if (row.status !== 'fulfilled' || !row.value) continue;
-    const list = Array.isArray(row.value.data.children) ? row.value.data.children : [];
-    for (const { data: child } of list) {
-      const title = child.title;
-      if (!title || child.stickied || child.over_18) continue;
-      const tl = (title || '').toLowerCase();
-      const category =
-        /bitcoin|btc/i.test(tl) ? 'bitcoin' :
-        /ethereum|eth/i.test(tl) ? 'ethereum' :
-        /solana/i.test(tl) ? 'solana' :
-        tl.includes('defi') || tl.includes('yield') || tl.includes('governance') ? 'defi' :
-        /regulation|cftc|sec|treasury|bills/i.test(tl) ? 'regulation' :
-        tl.includes('usdc') || tl.includes('stablecoin') || tl.includes('cross-border') || tl.includes('circle') ? 'payments' :
-        'crypto';
-      const time = new Date((child.created_utc || Date.now()/1000) * 1000);
-      const timeAgo = getTimeAgo(time);
-      const url = 'https://www.reddit.com' + (child.permalink || '');
-      if (seen.has(url)) continue;
-      seen.add(url);
-      items.push({
-        title,
-        excerpt: (child.selftext || child.title).slice(0, 220),
-        source: 'r/' + (child.subreddit || 'news'),
-        url,
-        category,
-        tags: [category],
-        time: timeAgo,
-        image: child.thumbnail && /^https?:\/\//.test(child.thumbnail) ? child.thumbnail : '',
-        type: 'news'
-      });
-    }
+  if (feature) {
+    document.getElementById('feature-title').textContent = '';
+    document.getElementById('feature-excerpt').textContent = '';
+    document.getElementById('feature-meta').textContent = '';
   }
-  LIVE.length = 0;
-  items.forEach(n => LIVE.push(n));
-  if (LIVE.length) return LIVE;
-  return [...NEWS];
 }
+function showError(message) {
+  const container = document.getElementById('latest');
+  if (container)
+    container.innerHTML = `<div class="news-error">⚠️ ${esc(message || 'Could not load the live news feed right now. Please try again soon.')}</div>`;
+}
+
 function renderHero(item) {
   const img = document.getElementById('hero-img');
   const title = document.getElementById('hero-title');
@@ -261,7 +238,8 @@ function renderHero(item) {
   const link = document.getElementById('hero-link');
   if (!img || !item) return;
 
-  img.style.backgroundImage = `url('${resolveImage(item)}')`;
+  const resolved = resolveImage(item);
+  if (resolved) img.style.backgroundImage = `url('${esc(resolved)}')`;
   if (title) title.textContent = item.title;
   if (excerpt) excerpt.textContent = item.excerpt;
   if (meta) meta.textContent = `${item.source} · ${fmtTime(item.time)}`;
@@ -269,27 +247,36 @@ function renderHero(item) {
     badge.textContent = item.category || 'NEWS';
     badge.className = 'badge ' + (item.category || '');
   }
-  if (link) link.href = item.url || '#';
+  if (item.url && item.url !== '#') {
+    link.href = item.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+  } else {
+    link.href = 'javascript:void(0)';
+  }
 }
 
 function renderTopStories(items) {
   const root = document.getElementById('topstories');
   if (!root) return;
   const top = items.slice(0, 3);
-  root.innerHTML = top.map(n => `
-    <a class="ts-card" href="${n.url || '#'}" target="_blank" rel="noopener">
-      <div class="ts-img" style="background-image:url('${resolveImage(n)}')"></div>
-      <div class="ts-body">
-        <span class="badge">${n.category}</span>
-        <h4>${esc(n.title)}</h4>
-        <span class="meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
-      </div>
-    </a>
-  `).join('');
+  root.innerHTML = top
+    .map(
+      (n) =>
+        `<a class="ts-card" href="${esc(n.url || '#')}" target="_blank" rel="noopener">
+        <div class="ts-img" style="background-image:url('${esc(resolveImage(n))}')"></div>
+        <div class="ts-body">
+          <span class="badge">${esc(n.category)}</span>
+          <h4>${esc(n.title)}</h4>
+          <span class="meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
+        </div>
+      </a>`
+    )
+    .join('');
 }
 
 function renderFeature(items) {
-  const pick = items.find(n => n.type === 'feature') || items[0];
+  const pick = items.find((n) => n.type === 'feature') || items[0];
   if (!pick) return;
 
   const img = document.getElementById('feature-img');
@@ -299,14 +286,20 @@ function renderFeature(items) {
   const link = document.getElementById('feature-link');
   const badge = document.getElementById('feature-badge');
 
-  if (img) img.style.backgroundImage = `url('${resolveImage(pick)}')`;
+  if (img) img.style.backgroundImage = `url('${esc(resolveImage(pick))}')`;
   if (title) title.textContent = pick.title;
   if (excerpt) excerpt.textContent = pick.excerpt;
   if (meta) meta.textContent = `${pick.source} · ${fmtTime(pick.time)} · Feature`;
-  if (link) link.href = pick.url || '#';
   if (badge) {
     badge.textContent = pick.category ? pick.category.charAt(0).toUpperCase() + pick.category.slice(1) : 'Feature';
     badge.className = 'badge ' + (pick.category || '');
+  }
+  if (pick.url && pick.url !== '#') {
+    link.href = pick.url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+  } else {
+    link.href = 'javascript:void(0)';
   }
 }
 
@@ -314,29 +307,36 @@ function renderLatest(items) {
   const root = document.getElementById('latest');
   const count = document.getElementById('latest-count');
   if (!root) return;
-  const list = items.filter(n => n.type !== 'feature');
-  if (count) count.textContent = `${list.length} articles`;
-  root.innerHTML = list.map(n => `
-    <a class="list-row" href="${n.url || '#'}" target="_blank" rel="noopener">
-      <div class="list-thumb" style="background-image:url('${resolveImage(n)}')"></div>
-      <div class="list-main">
-        <span class="list-title">${esc(n.title)}</span>
-        <span class="list-meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
-      </div>
-      <span class="badge">${n.category}</span>
-    </a>
-  `).join('');
+  if (count) count.textContent = `${items.length} articles`;
+  if (!items.length) {
+    root.innerHTML = '<div class="news-loading">No articles match this filter yet.</div>';
+    return;
+  }
+  const list = items.filter((n) => n.type !== 'feature');
+  root.innerHTML = list
+    .map(
+      (n) =>
+        `<a class="list-row" href="${esc(n.url || '#')}" target="_blank" rel="noopener">
+        <div class="list-thumb" style="background-image:url('${esc(resolveImage(n))}')"></div>
+        <div class="list-main">
+          <span class="list-title">${esc(n.title)}</span>
+          <span class="list-meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
+        </div>
+        <span class="badge">${esc(n.category)}</span>
+      </a>`
+    )
+    .join('');
 }
 
 function initTags() {
-  document.querySelectorAll('[data-tag]').forEach(btn => {
+  document.querySelectorAll('[data-tag]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      document.querySelectorAll('[data-tag]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      const tag = btn.dataset.tag || 'all';
-      const q = document.getElementById('tw-search')?.value || '';
-      filter({ activeTag: tag, q });
+      activeTag = btn.dataset.tag || 'all';
+      activeQuery = document.getElementById('tw-search')?.value || '';
+      filter({ activeTag, q: activeQuery });
     });
   });
 }
@@ -347,14 +347,17 @@ function initTicker() {
   if (!el) return;
   const render = (ticks) => {
     if (!ticks.length) return;
-    el.innerHTML = '&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;'.repeat(6) +
-      ticks.map(x => {
-        const m = x.match(/^(.+?)\s+\$([\d,.]+)$/);
-        if (m) {
-          return `&nbsp;<span class="ticker-name">${m[1]}</span>&nbsp;<span class="ticker-price">$${m[2]}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
-        }
-        return `&nbsp;<span class="ticker-item">${x}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
-      }).join('');
+    el.innerHTML =
+      '&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;'.repeat(6) +
+      ticks
+        .map((x) => {
+          const m = x.match(/^(.+?)\s+\$([\d,.]+)$/);
+          if (m) {
+            return `&nbsp;<span class="ticker-name">${esc(m[1])}</span>&nbsp;<span class="ticker-price">$${esc(m[2])}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
+          }
+          return `&nbsp;<span class="ticker-item">${esc(x)}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
+        })
+        .join('');
   };
   renderTrending();
   const upd = async () => {
@@ -363,14 +366,14 @@ function initTicker() {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const ticks = (Array.isArray(data) ? data : [])
-        .filter(c => c.current_price != null)
-        .map(c => ({
+        .filter((c) => c.current_price != null)
+        .map((c) => ({
           symbol: c.symbol.toUpperCase(),
           price: Number(c.current_price),
-          change: Number(c.price_change_percentage_24h || 0)
+          change: Number(c.price_change_percentage_24h || 0),
         }));
       TICKER_CACHE = ticks;
-      const ts = ticks.map(t => `${t.symbol} $${t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`);
+      const ts = ticks.map((t) => `${t.symbol} $${t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`);
       render(ts);
       renderTrending();
     } catch {
@@ -381,7 +384,7 @@ function initTicker() {
         'BCH $302', 'XLM $0.11', 'ALGO $0.18', 'ATOM $4.55',
         'VET $0.022', 'FIL $5.68', 'APT $8.33', 'ARB $0.45',
         'OP $2.12', 'INJ $22.4', 'SUI $2.82', 'PEPE $0.0000114',
-        'SHIB $0.0000158'
+        'SHIB $0.0000158',
       ]);
     }
   };
@@ -452,112 +455,156 @@ function initNewsletter() {
   if (form) form.addEventListener('submit', handleTokenWireSubscribe);
 }
 
-function initLiveNews() {
+function nowStamp() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function matchesQuery(n, q) {
+  const term = String(q || '').toLowerCase().trim();
+  if (!term) return true;
+  return [n.title, n.excerpt, n.source].some((s) => String(s || '').toLowerCase().includes(term));
+}
+function matchesTag(n, tag) {
+  const t = String(tag || '').toLowerCase();
+  if (!t || t === 'all') return true;
+  return (
+    String(n.category || '').toLowerCase() === t ||
+    (Array.isArray(n.tags) && n.tags.some((tagItem) => String(tagItem || '').toLowerCase() === t))
+  );
+}
+function applyFilter(items) {
+  return items.filter((n) => matchesTag(n, activeTag) && matchesQuery(n, activeQuery));
+}
+
+function renderFiltered(items) {
+  const base = applyFilter(items || NEWS);
+  const sorted = base.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  renderHero(sorted[0] || base[0] || NEWS[0]);
+  renderTopStories(sorted);
+  renderLatest(sorted);
+  renderFeature(sorted);
+}
+
+function setLastUpdated(tsText) {
   const ts = document.getElementById('live-ts');
+  if (ts) ts.textContent = `Last updated at ${tsText || nowStamp()}`;
+}
+
+async function fetchCryptoCompareNews() {
+  const res = await fetch(CRYPTOCOMPARE_NEWS_URL);
+  if (!res.ok) throw new Error(`CryptoCompare news failed: HTTP ${res.status}`);
+  const json = await res.json();
+  const list = Array.isArray(json?.Data) ? json.Data : [];
+  const mapped = list.map(normalizeNewsItem);
+  if (!mapped.length) throw new Error('CryptoCompare returned no news items.');
+  return mapped;
+}
+
+async function refreshLiveNews() {
+  const items = await fetchCryptoCompareNews();
+  const ts = document.getElementById('live-ts');
+  if (ts) ts.dataset.fallback = '0';
+  renderFiltered(items);
+  setLastUpdated();
+}
+
+function showLiveError(message) {
+  const fallback = [...NEWS];
+  renderFiltered(fallback);
+  setLastUpdated();
   const status = document.getElementById('live-status');
-  const refresh = async () => {
-    let items;
-    try {
-      items = await fetchFeed();
-    } catch {
-      items = null;
-    }
-    const source = items && items.length ? items : [...NEWS];
-    renderHero(source[0] || NEWS[0]);
-    renderTopStories(source);
-    renderLatest(source.filter(n => n.type !== 'feature'));
-    renderFeature(source);
-    if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (status) status.textContent = source && source.length && source !== LIVE ? 'Live feed unavailable — showing curated news.' : '';
-  };
-  refresh();
-  setInterval(refresh, 5 * 60 * 1000);
+  if (status) {
+    status.textContent = message || 'Live feed unavailable right now — showing curated news.';
+    status.classList.add('error');
+  }
 }
 
-
-
-function getTimeAgo(date) {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return seconds + 's ago';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return minutes + 'm ago';
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours + 'h ago';
-  const days = Math.floor(hours / 24);
-  return days + 'd ago';
-}
-
-function initSearch() {
-  const input = document.getElementById('tw-search');
-  const clear = document.getElementById('tw-search-clear');
-  const rootLatest = document.getElementById('latest');
-  if (!input) return;
-  const q = (v) => String(v || '').toLowerCase();
-  const apply = (term) => filter({ q: term });
-  const filter = (term) => {
-    document.querySelectorAll('[data-tag]').forEach(b => b.classList.remove('active'));
-    if (clear) clear.style.display = term ? 'inline-flex' : 'none';
-    apply(term || '');
-    if (!term) document.querySelector('[data-tag="all"]')?.classList.add('active');
-  };
-  let t;
-  input.addEventListener('input', (e) => {
-    clear.style.display = e.target.value ? 'inline-flex' : 'none';
-    clearTimeout(t);
-    t = setTimeout(() => filter(e.target.value.trim()), 120);
-  });
-  if (clear) {
-    clear.addEventListener('click', () => { input.value = ''; clear.style.display = 'none'; filter(''); });
-    clear.style.display = 'none';
+async function bootstrapLiveNews() {
+  showLoadingSpinner();
+  try {
+    await refreshLiveNews();
+  } catch (err) {
+    console.warn('TokenWire live news failed:', err);
+    showLiveError('Live news failed to load. Showing curated news for now.');
   }
 }
 
 function filter(state) {
   const active = state?.activeTag || 'all';
   const q = state?.q ? String(state.q).toLowerCase().trim() : '';
-  let base = active === 'all' ? [...NEWS] : NEWS.filter(n => n.category === active || (Array.isArray(n.tags) && n.tags.includes(active)));
-  if (q) base = base.filter(n => [n.title, n.excerpt, n.source].some(s => String(s || '').toLowerCase().includes(q)));
-  const sorted = base.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-  const hero = sorted[0] || base[0] || NEWS[0];
-  renderHero(hero);
-  renderTopStories(sorted);
-  renderLatest(sorted.filter(n => n.type !== 'feature'));
-  renderFeature(sorted);
-  const target = document.getElementById('topstories-section') || document.getElementById('latest-section');
-  if (target) window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
+  activeTag = active;
+  activeQuery = q;
+  document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
+  document.querySelector(`[data-tag="${active}"]`)?.classList.add('active');
+  // Render from cached live collection best-effort, else curated feed only
+  renderFiltered(LIVE.length ? LIVE : NEWS);
 }
+
+function initSearch() {
+  const input = document.getElementById('tw-search');
+  const clear = document.getElementById('tw-search-clear');
+  const root = document.getElementById('latest');
+  if (!input) return;
+  const apply = (term) => filter({ q: term });
+  const filterWithCache = (term) => {
+    document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
+    if (clear) clear.style.display = term ? 'inline-flex' : 'none';
+    apply(term || '');
+    if (!term) document.querySelector('[data-tag="all"]')?.classList.add('active');
+  };
+  let t;
+  input.addEventListener('input', (e) => {
+    if (clear) clear.style.display = e.target.value ? 'inline-flex' : 'none';
+    clearTimeout(t);
+    t = setTimeout(() => filterWithCache(e.target.value.trim()), 120);
+  });
+  if (clear) {
+    clear.addEventListener('click', () => {
+      input.value = '';
+      clear.style.display = 'none';
+      filterWithCache('');
+    });
+    clear.style.display = 'none';
+  }
+}
+
 function renderTrending() {
   const root = document.getElementById('trending-list');
   if (!root) return;
   const list = [
-    { name: 'Bitcoin', price: "$61,400", change: "+1.42%" },
-    { name: 'Ethereum', price: "$1,660", change: "+0.87%" },
-    { name: 'Solana', price: "$81.07", change: "+0.69%" },
-    { name: 'Hyperliquid', price: "$22.40", change: "+3.18%" },
-    { name: 'Aave', price: "$92.30", change: "-0.45%" }
+    { name: 'Bitcoin', price: '$61,400', change: '+1.42%' },
+    { name: 'Ethereum', price: '$1,660', change: '+0.87%' },
+    { name: 'Solana', price: '$81.07', change: '+0.69%' },
+    { name: 'Hyperliquid', price: '$22.40', change: '+3.18%' },
+    { name: 'Aave', price: '$92.30', change: '-0.45%' },
   ];
-  root.innerHTML = list.map(n => `
-    <div class="trending-item">
-      <span class="trending-name">${esc(n.name)}</span>
-      <div>
-        <span class="trending-price">${n.price}</span>
-        <span class="trending-change ${n.change.startsWith('+') ? 'up' : 'down'}">${n.change}</span>
-      </div>
-    </div>
-  `).join('');
+  root.innerHTML = list
+    .map(
+      (n) =>
+        `<div class="trending-item">
+        <span class="trending-name">${esc(n.name)}</span>
+        <div>
+          <span class="trending-price">${esc(n.price)}</span>
+          <span class="trending-change ${n.change.startsWith('+') ? 'up' : 'down'}">${esc(n.change)}</span>
+        </div>
+      </div>`
+    )
+    .join('');
 }
 function renderInsights() {
   const labels = [
     'Expert Analysis',
     'On-chain Insights',
     'Regulation Watch',
-    'DeFi Deep Dive'
+    'DeFi Deep Dive',
   ];
   const root = document.querySelector('.widget:nth-child(2) .about-text');
   if (!root) return;
-  root.textContent = `TokenWire curates ${labels[Math.floor(Math.random()*labels.length)]} across protocol design, governance risk, and policy shifts.`;
+  root.textContent = `TokenWire curates ${labels[Math.floor(Math.random() * labels.length)]} across protocol design, governance risk, and policy shifts.`;
 }
-function bootstrap() {
+
+const LIVE = [];
+async function bootstrap() {
   try {
     renderHero(NEWS[0]);
     renderTopStories(NEWS);
@@ -569,7 +616,8 @@ function bootstrap() {
     initTicker();
     initNewsletter();
     initSearch();
-    initLiveNews();
+    bootstrapLiveNews();
+    setInterval(bootstrapLiveNews, 60 * 60 * 1000);
   } catch (err) {
     console.error('TokenWire bootstrap failed:', err);
     const fallback = document.createElement('div');
