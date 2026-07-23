@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TokenWire — Crypto News</title>
+  <meta name="description" content="TokenWire is a Solana-inspired crypto news aggregator with live markets, real-time updates, and expert analysis." />
+  <meta name="theme-color" content="#0b0d14" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -474,13 +477,14 @@
         <a class="tag" href="#" data-tag="payments">#Payments</a>
         <a class="tag" href="#" data-tag="regulation">#Regulation</a>
         <span class="muted" id="live-indicator" style="margin-left:auto; font-size:0.8rem;">● Live <span id="live-ts"></span></span>
+        <span class="muted" id="live-status" style="margin-left:12px; font-size:0.8rem; color:#ff8a8a;"></span>
       </div>
     </div>
   </header>
 
   <main class="container">
     <div class="hero">
-      <a class="hero-card" href="#" target="_blank" rel="noopener" id="hero-link">
+      <a class="hero-card" href="javascript:void(0)" target="_blank" rel="noopener" id="hero-link">
         <div class="hero-img" id="hero-img"></div>
         <div class="hero-text">
           <span class="badge" id="hero-badge"></span>
@@ -502,7 +506,7 @@
         <span class="badge" id="feature-badge">Feature</span>
         <h3 id="feature-title"></h3>
         <p id="feature-excerpt"></p>
-        <a class="news-link" href="#" id="feature-link" target="_blank" rel="noopener">Read more →</a>
+        <a class="news-link" href="javascript:void(0)" id="feature-link" target="_blank" rel="noopener">Read more →</a>
         <span class="meta" id="feature-meta"></span>
       </div>
     </div>

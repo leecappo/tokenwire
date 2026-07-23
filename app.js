@@ -454,13 +454,21 @@ function initNewsletter() {
 
 function initLiveNews() {
   const ts = document.getElementById('live-ts');
+  const status = document.getElementById('live-status');
   const refresh = async () => {
-    const items = await fetchFeed();
-    renderHero(items[0] || NEWS[0]);
-    renderTopStories(items);
-    renderLatest(items.filter(n => n.type !== 'feature'));
-    renderFeature(items);
+    let items;
+    try {
+      items = await fetchFeed();
+    } catch {
+      items = null;
+    }
+    const source = items && items.length ? items : [...NEWS];
+    renderHero(source[0] || NEWS[0]);
+    renderTopStories(source);
+    renderLatest(source.filter(n => n.type !== 'feature'));
+    renderFeature(source);
     if (ts) ts.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (status) status.textContent = source && source.length && source !== LIVE ? 'Live feed unavailable — showing curated news.' : '';
   };
   refresh();
   setInterval(refresh, 5 * 60 * 1000);

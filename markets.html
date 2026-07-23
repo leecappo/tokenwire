@@ -4,9 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TokenWire — Markets</title>
+  <meta name="description" content="TokenWire Markets: live crypto prices, market cap, volume, and sparkline charts." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -279,13 +281,17 @@
       if (!prices || prices.length < 2) return '#888';
       const start = prices[0][1];
       const end = prices[prices.length - 1][1];
-      return end >= start ? 'var(--accent-1)' : 'var(--red)';
+      return end >= start ? '#14f195' : '#ff4d6a';
     }
 
     async function fetchJSON(url) {
-      const res = await fetch(url);
+      const cors = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(cors, { headers: { 'Accept': 'application/json' } });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
+      const txt = await res.text();
+      const m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+      if (!m) throw new Error('Empty response');
+      return JSON.parse(m[0]);
     }
 
     async function loadMarkets() {
@@ -415,7 +421,7 @@
             datasets: [{
               label: coin.symbol?.toUpperCase() + ' (USD)',
               data: prices.map(p => p.y),
-              borderColor: up ? 'var(--accent-1)' : 'var(--red)',
+              borderColor: up ? '#14f195' : '#ff4d6a',
               backgroundColor: 'rgba(153, 69, 255, 0.12)',
               borderWidth: 2,
               fill: true,
