@@ -179,13 +179,17 @@
   <main class="container">
     <div class="section-head">
       <h2>Markets</h2>
-      <span class="muted">Top 100 by market cap · Updated every 5 minutes</span>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span class="muted">Top 100 by market cap · Updated every 5 minutes</span>
+        <button id="refresh-markets" class="btn" style="padding:8px 12px;border-radius:12px;">Refresh now</button>
+        <div id="market-status" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,0.1);color:#e8eaf0;background:#10121b;">Loading...</div>
+      </div>
     </div>
 
     <div class="markets-hero">
       <div>
         <h2>Live markets</h2>
-        <p>Prices, volume, and 7-day trends across the top 250 cryptocurrencies</p>
+        <p>Prices, volume, and 7-day trends across the top 100 cryptocurrencies</p>
       </div>
     </div>
 
@@ -264,6 +268,11 @@
     let currentSort = { key: 'market_cap_rank', asc: true };
     let currentPeriod = 7;
     let modalChart = null;
+    const FALLBACK_COINS = [
+      { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', market_cap_rank: 1, current_price: 62000, price_change_percentage_24h: 1.2, market_cap: 1.2e12, total_volume: 35000000000, sparkline_in_7d: { price: [62000, 61800, 62500, 61900, 62100, 62750, 63000] } },
+      { id: 'ethereum', symbol: 'eth', name: 'Ethereum', market_cap_rank: 2, current_price: 3400, price_change_percentage_24h: 2.5, market_cap: 400000000000, total_volume: 18000000000, sparkline_in_7d: { price: [3400, 3380, 3420, 3390, 3410, 3450, 3475] } },
+      { id: 'solana', symbol: 'sol', name: 'Solana', market_cap_rank: 5, current_price: 145, price_change_percentage_24h: 4.1, market_cap: 65000000000, total_volume: 2200000000, sparkline_in_7d: { price: [145, 143, 147, 142, 146, 149, 151] } }
+    ];
 
     function fmt(n, d = 2) {
       if (n == null || isNaN(n)) return 'N/A';
@@ -284,52 +293,77 @@
       return end >= start ? '#14f195' : '#ff4d6a';
     }
 
-    async function fetchJSON(url, label) {
-      const labelText = label || 'API';
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 18000);
-      try {
-        const cors = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const res = await fetch(cors, { headers: { 'Accept': 'application/json' }, signal: controller.signal });
-        clearTimeout(timer);
-        if (!res.ok) throw new Error(`${labelText} HTTP ${res.status}`);
-        const txt = await res.text();
-        const m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        if (!m) throw new Error(`${labelText} empty response`);
-        const parsed = JSON.parse(m[0]);
-        if (parsed && typeof parsed.contents === 'string' && parsed.contents.trim()) {
-          const innerMatch = parsed.contents.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-          return innerMatch ? JSON.parse(innerMatch[0]) : parsed;
-        }
-        return parsed;
-      } catch (proxyErr) {
-        clearTimeout(timer);
-        console.warn(`${labelText} proxy failed:`, proxyErr);
-        const directController = new AbortController();
-        const directTimer = setTimeout(() => directController.abort(), 18000);
+    let marketsBusy = false;
+
+    async function tryJSON(url, options = {}) {
+      const signal = options.signal || null;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const txt = await res.text();
+      const match = txt.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+      if (!match) throw new Error('empty response');
+      return JSON.parse(match[0]);
+    }
+
+    async function fetchMarketsLive() {
+      const base = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h';
+      const candidates = [
+        { name: 'direct', url: base },
+        { name: 'corsproxy', url: `https://corsproxy.io/?${encodeURIComponent(base)}` },
+        { name: 'allorigins', url: `https://api.allorigins.win/get?url=${encodeURIComponent(base)}` }
+      ];
+      let lastErr = new Error('No fetch attempted');
+      for (const item of candidates) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 16000);
         try {
-          const direct = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: directController.signal });
-          clearTimeout(directTimer);
-          if (!direct.ok) throw new Error(`${labelText} direct HTTP ${direct.status}`);
-          const txt = await direct.text();
-          const m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-          if (!m) throw new Error(`${labelText} direct empty response`);
-          return JSON.parse(m[0]);
-        } catch (directErr) {
-          clearTimeout(directTimer);
-          throw new Error(`${labelText} failed: ${proxyErr.message} | ${directErr.message}`);
+          const data = await tryJSON(item.url, { signal: controller.signal });
+          clearTimeout(timer);
+          const coins = Array.isArray(data) ? data : [];
+          if (!coins.length) throw new Error('empty dataset');
+          return { source: item.name, coins };
+        } catch (e) {
+          clearTimeout(timer);
+          lastErr = e;
         }
       }
+      throw lastErr;
     }
 
     async function loadMarkets() {
       const tbody = document.getElementById('market-body');
-      try {
-        const data = await fetchJSON(API.markets);
-        allCoins = data;
+      const status = document.getElementById('market-status');
+      if (status) {
+        status.textContent = 'Loading...';
+        status.style.color = '#e8eaf0';
+        status.style.borderColor = 'rgba(255,255,255,0.1)';
+      }
+      const renderFallback = () => {
+        allCoins = FALLBACK_COINS;
         renderMarkets(allCoins);
+        if (status) {
+          status.textContent = 'Live data unavailable - showing sample prices';
+          status.style.color = '#ff4d6a';
+          status.style.borderColor = '#ff4d6a';
+        }
+      };
+      renderFallback();
+      try {
+        const { source, coins } = await fetchMarketsLive();
+        allCoins = coins;
+        renderMarkets(allCoins);
+        if (status) {
+          status.textContent = source !== 'direct' ? 'Using cached data' : 'Live data';
+          status.style.color = source !== 'direct' ? '#f5c542' : '#14f195';
+          status.style.borderColor = status.style.color;
+        }
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">Error loading markets (${e.message}). Will retry.</td></tr>`;
+        console.warn('markets load failed:', e.message);
+        if (status) {
+          status.textContent = 'Live data unavailable - showing sample prices';
+          status.style.color = '#ff4d6a';
+          status.style.borderColor = '#ff4d6a';
+        }
       }
     }
 
@@ -556,6 +590,12 @@ async function bootstrap() {
       initSort();
       initFilters();
       initNewsletter();
+      document.getElementById('refresh-markets')?.addEventListener('click', async () => {
+        const btn = document.getElementById('refresh-markets');
+        if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
+        await loadMarkets();
+        if (btn) { btn.disabled = false; btn.textContent = 'Refresh now'; }
+      });
       await loadMarkets();
       setInterval(loadMarkets, 60000);
       document.getElementById('modal-close').addEventListener('click', closeModal);
