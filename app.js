@@ -323,15 +323,23 @@ function renderLatest(items) {
     .join('');
 }
 
+function applyHashFilter() {
+  const raw = (location.hash || '').replace('#', '').toLowerCase().trim();
+  const allowed = new Set(['all','bitcoin','ethereum','solana','defi','payments','regulation']);
+  const tag = raw && allowed.has(raw) ? raw : 'all';
+  const q = document.getElementById('tw-search')?.value || '';
+  filter({ activeTag: tag, q, fromHash: true });
+}
+
 function initTags() {
+  applyHashFilter();
+  window.addEventListener('hashchange', applyHashFilter);
   document.querySelectorAll('[data-tag]').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      activeTag = btn.dataset.tag || 'all';
-      activeQuery = document.getElementById('tw-search')?.value || '';
-      filter({ activeTag, q: activeQuery });
+      const tag = btn.dataset.tag || 'all';
+      const q = document.getElementById('tw-search')?.value || '';
+      filter({ activeTag: tag, q });
     });
   });
 }
@@ -545,12 +553,19 @@ async function bootstrapLiveNews() {
 }
 
 function filter(state) {
-  const active = state?.activeTag || 'all';
+  const incoming = state?.activeTag || 'all';
   const q = state?.q ? String(state.q).toLowerCase().trim() : '';
-  activeTag = active;
+  activeTag = incoming;
   activeQuery = q;
-  document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
-  document.querySelector(`[data-tag="${active}"]`)?.classList.add('active');
+
+  const isHashChange = state?.fromHash === true;
+  document.querySelectorAll('[data-tag]').forEach((btn) => btn.classList.remove('active'));
+  const target = document.querySelector(`[data-tag="${CSS.escape(activeTag)}"]`);
+  if (target) target.classList.add('active');
+
+  if (!isHashChange && location.hash !== `#${activeTag}`) {
+    history.pushState(null, '', `#${activeTag}`);
+  }
   const items = liveCache.length ? liveCache : NEWS;
   renderFiltered(items);
 }
