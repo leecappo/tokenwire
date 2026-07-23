@@ -150,6 +150,9 @@ let activeTag = 'all';
 let activeQuery = '';
 
 const CRYPTOCOMPARE_NEWS_URL = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
+const NEWS_PROXY = 'https://api.allorigins.win/get?url=';
+const RSS_LIVE_FEED =
+  'https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss&count=12';
 
 function esc(s) {
   return String(s)
@@ -244,8 +247,7 @@ function renderHero(item) {
   if (excerpt) excerpt.textContent = item.excerpt;
   if (meta) meta.textContent = `${item.source} · ${fmtTime(item.time)}`;
   if (badge) {
-    badge.textContent = item.category || 'NEWS';
-    badge.className = 'badge ' + (item.category || '');
+    badge.textContent = item.sourceLabel || item.source;
   }
   if (item.url && item.url !== '#') {
     link.href = item.url;
@@ -323,6 +325,7 @@ function renderLatest(items) {
           <span class="list-meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
         </div>
         <span class="badge">${esc(n.category)}</span>
+        ${n.sourceLabel ? `<span class=\"source-badge\">${esc(n.sourceLabel)}</span>` : ''}
       </a>`
     )
     .join('');
@@ -490,18 +493,36 @@ function setLastUpdated(tsText) {
   if (ts) ts.textContent = `Last updated at ${tsText || nowStamp()}`;
 }
 
-async function fetchCryptoCompareNews() {
-  const res = await fetch(CRYPTOCOMPARE_NEWS_URL);
-  if (!res.ok) throw new Error(`CryptoCompare news failed: HTTP ${res.status}`);
-  const json = await res.json();
-  const list = Array.isArray(json?.Data) ? json.Data : [];
-  const mapped = list.map(normalizeNewsItem);
-  if (!mapped.length) throw new Error('CryptoCompare returned no news items.');
+async function fetchLiveCryptoNews() {
+  const res = await fetch(RSS_LIVE_FEED);
+  if (!res.ok) throw new Error(`RSS feed failed: HTTP ${res.status}`);
+  const data = await res.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+  if (!items.length) throw new Error('RSS returned no items.');
+
+  const mapped = items.slice(0, 12).map((item, index) => {
+    const category = categoryForNode(item);
+    const published = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
+    const thumbnail = item.thumbnail || item.enclosure?.link || '';
+    return {
+      title: item.title || 'Untitled',
+      excerpt: (item.description || item.title || '').replace(/<[^>]+>/g, '').slice(0, 220),
+      source: 'Cointelegraph',
+      url: item.link || '#',
+      category,
+      tags: [category],
+      time: published,
+      img: thumbnail,
+      sourceLabel: 'Live',
+      type: index === 0 ? 'feature' : 'news',
+    };
+  });
+
   return mapped;
 }
 
 async function refreshLiveNews() {
-  const items = await fetchCryptoCompareNews();
+  const items = await fetchLiveCryptoNews();
   const ts = document.getElementById('live-ts');
   if (ts) ts.dataset.fallback = '0';
   renderFiltered(items);
@@ -512,9 +533,9 @@ function showLiveError(message) {
   const fallback = [...NEWS];
   renderFiltered(fallback);
   setLastUpdated();
-  const status = document.getElementById('live-status');
+  const status = document.getElementById('feed-status');
   if (status) {
-    status.textContent = message || 'Live feed unavailable right now — showing curated news.';
+    status.textContent = message || 'Live news unavailable — showing curated news.';
     status.classList.add('error');
   }
 }
