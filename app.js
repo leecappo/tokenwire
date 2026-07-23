@@ -592,6 +592,20 @@ function initNavLinks() {
       const target = document.querySelector(href);
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        const label = link.textContent.trim().toLowerCase();
+        const fallbackMap = {
+          latest: '#latest-section',
+          'latest news': '#latest-section',
+          topstories: '#topstories-section',
+          'top stories': '#topstories-section',
+          features: '#features',
+        };
+        const mapped = fallbackMap[label];
+        if (mapped) {
+          const mappedTarget = document.querySelector(mapped);
+          if (mappedTarget) mappedTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
     });
   });
