@@ -1,754 +1,360 @@
-/* TokenWire App */
+/* TokenWire - Live data layer */
+(() => {
+  const NEWS_CACHE_KEY = 'tw_news_cache';
+  const TICKER_CACHE_KEY = 'tw_ticker_cache';
+  const NEWS_TTL_MS = 60 * 60 * 1000;
+  const TICKER_TTL_MS = 5 * 60 * 1000;
 
-const NEWS = [
-  {
-    title: 'Solana Foundation pushes governance proposal for validator fee changes',
-    excerpt: 'The foundation wants to tweak validator economics as network revenue remains elevated and dApp demand climbs.',
-    source: 'Solana Foundation',
-    url: 'https://solana.com/news',
-    category: 'solana',
-    tags: ['solana'],
-    time: '2 hours ago',
-    img: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Jupiter DEX routes another month of multi-billion dollar weekly Solana volume',
-    excerpt: 'Aggregated DEX activity remains strong on Solana, with Jupiter still dominant despite quarterly revenue slowing in some metrics.',
-    source: 'Dune / Solflare',
-    url: 'https://memeburn.com/solana-defi-volumes-surge-after-jupiters-latest-trading-update/',
-    category: 'defi',
-    tags: ['solana', 'defi'],
-    time: '8 hours ago',
-    img: 'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Bitcoin hits key resistance above $62K as ETF inflows accelerate',
-    excerpt: 'Spot Bitcoin ETFs saw their strongest weekly inflows since March, reigniting bullish momentum into month-end.',
-    source: 'CoinDesk',
-    url: 'https://coindesk.com',
-    category: 'bitcoin',
-    tags: ['bitcoin'],
-    time: '3 hours ago',
-    img: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Ethereum Pectra upgrade timeline updated for late Q2',
-    excerpt: 'Core developers confirmed the next major network upgrade will target late June with account abstraction improvements.',
-    source: 'Ethereum Foundation',
-    url: 'https://blog.ethereum.org',
-    category: 'ethereum',
-    tags: ['ethereum'],
-    time: '5 hours ago',
-    img: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'UK Treasury consults on crypto promotions rules with stricter enforcement planned',
-    excerpt: 'Updated guidance could change how exchanges and token projects advertise in the UK from late 2026.',
-    source: 'HMT',
-    url: 'https://www.gov.uk/government/consultations',
-    category: 'regulation',
-    tags: ['regulation'],
-    time: '12 hours ago',
-    img: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
-    type: 'feature',
-  },
-  {
-    title: 'Pump.fun lifetime revenue crosses $800M as weekly buybacks continue',
-    excerpt: 'Revenue remains high but growth rate is moderating; more competition from newer Solana consumer apps is emerging.',
-    source: 'Tokenomics.com',
-    url: 'https://tokenomics.com',
-    category: 'solana',
-    tags: ['solana'],
-    time: '14 hours ago',
-    img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Marinade Finance launches earthquake relief yield campaign in Venezuela',
-    excerpt: 'SOL holders can donate staking rewards to earthquake victims without exiting positions, via a Solana Foundation-linked program.',
-    source: 'Marinade',
-    url: 'https://marinade.finance',
-    category: 'defi',
-    tags: ['solana', 'defi'],
-    time: '16 hours ago',
-    img: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'USDC issuer Circle explores new custody partnerships as stablecoin issuance climbs',
-    excerpt: 'With stablecoin supply climbing again, Circle is expanding its institutional wallet and treasury options.',
-    source: 'Circle',
-    url: 'https://circle.com',
-    category: 'payments',
-    tags: ['payments'],
-    time: '18 hours ago',
-    img: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'SEC delays spot Ethereum ETF decision while fee wars intensify',
-    excerpt: 'The regulator postponed its ruling again, while issuers cut fees in anticipation of a crowded ETF market.',
-    source: 'Bloomberg',
-    url: 'https://bloomberg.com',
-    category: 'ethereum',
-    tags: ['ethereum'],
-    time: '24 hours ago',
-    img: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Bitcoin miners hold as halving revenue pressure shifts toward fee reliance',
-    excerpt: 'Hashrate remains stable despite compressed margins, suggesting miner confidence in longer-term fee-based revenue.',
-    source: 'CoinDesk',
-    url: 'https://coindesk.com',
-    category: 'bitcoin',
-    tags: ['bitcoin'],
-    time: '26 hours ago',
-    img: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80',
-    type: 'news',
-  },
-  {
-    title: 'Japan updates stablecoin and payments licensing framework for 2026',
-    excerpt: 'New rules clarify issuer requirements and custodial arrangements for yen-backed stablecoins.',
-    source: 'Nikkei Asia',
-    url: 'https://asia.nikkei.com',
-    category: 'payments',
-    tags: ['payments', 'regulation'],
-    time: '28 hours ago',
-    img: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
-    type: 'news',
-  },
-];
+  const COIN_SLUGS = ['bitcoin','ethereum','solana','binancecoin','ripple','dogecoin','cardano','avalanche-2'];
+  const COIN_MAP = { bitcoin:'BTC', ethereum:'ETH', solana:'SOL', 'binancecoin':'BNB', ripple:'XRP', dogecoin:'DOGE', cardano:'ADA', 'avalanche-2':'AVAX' };
 
-const CATEGORY_LABELS = {
-  all: 'All',
-  bitcoin: 'Bitcoin',
-  ethereum: 'Ethereum',
-  solana: 'Solana',
-  defi: 'DeFi',
-  payments: 'Payments',
-  regulation: 'Regulation',
-  crypto: 'Crypto',
-};
-
-let activeTag = 'all';
-let activeQuery = '';
-let liveCache = [];
-let liveSourceLabel = 'Curated';
-
-const CRYPTOCOMPARE_NEWS_URL =
-  'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
-const NEWS_PROXY = 'https://api.allorigins.win/get?url=';
-
-function esc(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, "&#39;");
-}
-
-function fmtTime(t) { return t || 'recently'; }
-
-function resolveImage(n) {
-  const raw = n.img || n.image || '';
-  if (raw && /^https?:\/\//i.test(raw)) return raw;
-  const map = {
-    bitcoin: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80',
-    ethereum: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
-    solana: 'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1200&q=80',
-    defi: 'https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1200&q=80',
-    payments: 'https://images.unsplash.com/photo-1620336655055-088d06e36bf0?w=1200&q=80',
-    regulation: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=80',
-    crypto: 'https://images.unsplash.com/photo-1516245834210-cc1007553f13?w=1200&q=80',
+  const SECTIONS = {
+    topstories: document.querySelector('#topstories .topstories'),
+    features: document.querySelector('#features .features'),
+    latest: document.querySelector('#latest .latest-list')
   };
-  const cat = (n.category || 'crypto').toLowerCase();
-  return map[cat] || map['crypto'];
-}
 
-function categoryForNode(node) {
-  const body = [node.title, node.body || '', node.tags ? node.tags.join(' ') : ''].join(' ').toLowerCase();
-  if (/bitcoin|btc/i.test(body)) return 'bitcoin';
-  if (/ethereum|eth/i.test(body)) return 'ethereum';
-  if (/solana|sol/i.test(body)) return 'solana';
-  if (/defi|yield|governance|lending|liquidity|dex/i.test(body)) return 'defi';
-  if (/regulation|sec|cftc|treasury|law|compliance/i.test(body)) return 'regulation';
-  if (/stablecoin|usdc|usdt|payments|cross-border/i.test(body)) return 'payments';
-  return 'crypto';
-}
+  const filterBar = document.querySelector('.filter-bar');
+  const filterPills = Array.from(document.querySelectorAll('.filter-pill'));
+  const liveBadge = document.getElementById('tw-live-badge');
+  const liveText = document.getElementById('tw-live-text');
 
-function normalizeNewsItem(node) {
-  const category = categoryForNode(node);
-  return {
-    title: node.title || 'Untitled',
-    excerpt: (node.body || node.title || '').replace(/<[^>]+>/g, '').slice(0, 220),
-    source: node.source || 'CryptoCompare',
-    url: node.url || '#',
-    category,
-    tags: [category],
-    time: 'recently',
-    img: node.imageurl || '',
-    type: 'news',
-  };
-}
+  function qs(selector, root = document) { return root.querySelector(selector); }
+  function qsa(selector, root = document) { return Array.from(root.querySelectorAll(selector)); }
 
-function showLoadingSpinner() {
-  const container = document.getElementById('latest');
-  const topstories = document.getElementById('topstories');
-  const heroLink = document.getElementById('hero-link');
-  const feature = document.getElementById('features');
-  if (container)
-    container.innerHTML =
-      '<div class="news-loading">Loading TokenWire feed...</div>';
-  if (topstories) topstories.innerHTML = '';
-  if (heroLink) {
-    document.getElementById('hero-title').textContent = '';
-    document.getElementById('hero-excerpt').textContent = '';
-    document.getElementById('hero-meta').textContent = '';
+  function createCard(item, type) {
+    const link = item.url || '#';
+    const title = item.title || 'Untitled';
+    const source = item.source || '';
+    const time = item.published_at ? new Date(item.published_at).toLocaleString() : '';
+    const badgeClass = (item.categories && item.categories[0] && item.categories[0].slug) ? item.categories[0].slug : '';
+    const img = item.image || '';
+
+    if (type === 'list') {
+      const el = document.createElement('a');
+      el.className = 'list-row';
+      el.href = link;
+      el.target = '_blank';
+      el.rel = 'noopener';
+      el.setAttribute('data-category', badgeClass);
+      el.innerHTML = `
+        <div class="list-thumb" style="background-image: url('${img}')"></div>
+        <div class="list-main">
+          <span class="list-title">${escapeHtml(title)}</span>
+          <span class="list-meta">${escapeHtml(source || '')} ${time ? '· ' + escapeHtml(time) : ''}</span>
+        </div>
+        <span class="badge">${escapeHtml(badgeClass || 'News')}</span>
+      `;
+      return el;
+    }
+
+    const article = document.createElement('article');
+    article.className = type === 'feature' ? 'feature-card' : 'ts-card';
+    article.setAttribute('data-category', badgeClass);
+    article.innerHTML = `
+      <a href="${link}" target="_blank" rel="noopener">
+        <div class="${type === 'feature' ? 'feature-img' : 'ts-img'}" style="background-image: url('${img}')"></div>
+        <div class="${type === 'feature' ? 'feature-body' : 'ts-body'}">
+          <span class="badge">${escapeHtml(badgeClass || 'News')}</span>
+          ${type === 'feature' ? `<p>${escapeHtml(title)}</p>` : `<h3>${escapeHtml(title)}</h3>`}
+          <span class="meta">${escapeHtml(source || '')} ${time ? '· ' + escapeHtml(time) : ''}</span>
+        </div>
+      </a>
+    `;
+    return article;
   }
-  if (feature) {
-    document.getElementById('feature-title').textContent = '';
-    document.getElementById('feature-excerpt').textContent = '';
-    document.getElementById('feature-meta').textContent = '';
+
+  function escapeHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
-}
 
-function showError(message) {
-  const container = document.getElementById('latest');
-  if (container)
-    container.innerHTML = '<div class="news-error">' + esc(message || 'Could not load the live news feed right now. Please try again soon.') + '</div>';
-}
-
-function renderHero(item) {
-  const img = document.getElementById('hero-img');
-  const title = document.getElementById('hero-title');
-  const excerpt = document.getElementById('hero-excerpt');
-  const meta = document.getElementById('hero-meta');
-  const badge = document.getElementById('hero-badge');
-  const link = document.getElementById('hero-link');
-  if (!img || !item) return;
-
-  const resolved = resolveImage(item);
-  if (resolved) img.style.backgroundImage = "url('" + esc(resolved) + "')";
-  if (title) title.textContent = item.title;
-  if (excerpt) excerpt.textContent = item.excerpt;
-  if (meta) meta.textContent = item.source + ' · ' + fmtTime(item.time);
-  if (badge) badge.textContent = item.sourceLabel || item.source;
-  if (item.url && item.url !== '#') {
-    link.href = item.url;
-    link.target = '_blank';
-    link.rel = 'noopener';
-  } else {
-    link.href = 'javascript:void(0)';
+  function normalizeCategory(category) {
+    const c = String(category || '').toLowerCase();
+    const map = { bitcoin:'bitcoin', ethereum:'ethereum', solana:'solana', defi:'defi', payments:'payments', regulation:'regulation' };
+    return map[c] || '';
   }
-}
 
-function renderTopStories(items) {
-  const root = document.getElementById('topstories');
-  if (!root) return;
-  const top = items.slice(0, 3);
-  root.innerHTML = top
-    .map(
-      (n) =>
-        '<a class="ts-card" href="' + esc(n.url || '#') + '" target="_blank" rel="noopener">' +
-        '<div class="ts-img" style="background-image:url(\'' + esc(resolveImage(n)) + '\')"></div>' +
-        '<div class="ts-body">' +
-        '<span class="badge">' + esc(n.category) + '</span>' +
-        '<h4>' + esc(n.title) + '</h4>' +
-        '<span class="meta">' + esc(n.source) + ' · ' + fmtTime(n.time) + '</span>' +
-        '</div>' +
-        '</a>'
-    )
-    .join('');
-}
-
-function renderFeature(items) {
-  const pick = items.find((n) => n.type === 'feature') || items[0];
-  if (!pick) return;
-
-  const img = document.getElementById('feature-img');
-  const title = document.getElementById('feature-title');
-  const excerpt = document.getElementById('feature-excerpt');
-  const meta = document.getElementById('feature-meta');
-  const link = document.getElementById('feature-link');
-  const badge = document.getElementById('feature-badge');
-
-  if (img) img.style.backgroundImage = "url('" + esc(resolveImage(pick)) + "')";
-  if (title) title.textContent = pick.title;
-  if (excerpt) excerpt.textContent = pick.excerpt;
-  if (meta) meta.textContent = pick.source + ' · ' + fmtTime(pick.time) + ' · Feature';
-  if (badge) {
-    badge.textContent = pick.category ? pick.category.charAt(0).toUpperCase() + pick.category.slice(1) : 'Feature';
-    badge.className = 'badge ' + (pick.category || '');
+  function tagCategory(item) {
+    if (!item) return '';
+    if (item.categories && item.categories[0]) {
+      const cat = item.categories[0].title || item.categories[0].slug || '';
+      const norm = normalizeCategory(cat);
+      if (norm) return norm;
+    }
+    const title = (item.title || '').toLowerCase();
+    const source = (item.source || '').toLowerCase();
+    if (title.includes('bitcoin') || source.includes('bitcoin')) return 'bitcoin';
+    if (title.includes('ethereum') || source.includes('ethereum')) return 'ethereum';
+    if (title.includes('solana') || source.includes('solana')) return 'solana';
+    if (title.includes('defi') || title.includes('jupiter') || title.includes('marinade')) return 'defi';
+    if (title.includes('payment') || title.includes('stablecoin') || title.includes('usdc')) return 'payments';
+    if (title.includes('sec') || title.includes('regulation') || title.includes('treasury')) return 'regulation';
+    return '';
   }
-  if (pick.url && pick.url !== '#') {
-    link.href = pick.url;
-    link.target = '_blank';
-    link.rel = 'noopener';
-  } else {
-    link.href = 'javascript:void(0)';
+
+  function renderArticles(articles, filter) {
+    const filterValue = (filter || 'all').toLowerCase();
+    const items = articles.map(a => ({ ...a, category: tagCategory(a) }));
+
+    // Top stories: pick first 3 matching items
+    const topData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(0, 3);
+    if (SECTIONS.topstories) {
+      SECTIONS.topstories.innerHTML = '';
+      if (topData.length) topData.forEach(it => SECTIONS.topstories.appendChild(createCard(it, 'ts')));
+      else SECTIONS.topstories.innerHTML = '<div class="muted">No articles right now.</div>';
+    }
+
+    // Features: pick next 3 matching items
+    const featureStart = topData.length ? 3 : 0;
+    const featureData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(featureStart, featureStart + 3);
+    if (SECTIONS.features) {
+      SECTIONS.features.innerHTML = '';
+      if (featureData.length) featureData.forEach(it => SECTIONS.features.appendChild(createCard(it, 'feature')));
+      else SECTIONS.features.innerHTML = '<div class="muted">No articles right now.</div>';
+    }
+
+    // Latest: up to 11
+    const latestData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(0, 11);
+    if (SECTIONS.latest) {
+      SECTIONS.latest.innerHTML = '';
+      if (latestData.length) latestData.forEach(it => SECTIONS.latest.appendChild(createCard(it, 'list')));
+      else SECTIONS.latest.innerHTML = '<div class="muted">No articles right now.</div>';
+    }
   }
-}
 
-function renderLatest(items) {
-  const root = document.getElementById('latest');
-  const count = document.getElementById('latest-count');
-  if (!root) return;
-  if (count) count.textContent = items.length + ' articles';
-  if (!items.length) {
-    root.innerHTML = '<div class="news-loading">No articles match this filter yet.</div>';
-    return;
-  }
-  const list = items.filter((n) => n.type !== 'feature');
-  root.innerHTML = list
-    .map(
-      (n) =>
-        '<a class="list-row" href="' + esc(n.url || '#') + '" target="_blank" rel="noopener">' +
-        '<div class="list-thumb" style="background-image:url(\'' + esc(resolveImage(n)) + '\')"></div>' +
-        '<div class="list-main">' +
-        '<span class="list-title">' + esc(n.title) + '</span>' +
-        '<span class="list-meta">' + esc(n.source) + ' · ' + fmtTime(n.time) + '</span>' +
-        '</div>' +
-        '<span class="badge">' + esc(n.category) + '</span>' +
-        (n.sourceLabel ? '<span class="source-badge">' + esc(n.sourceLabel) + '</span>' : '') +
-        '</a>'
-    )
-    .join('');
-}
-
-function applyHashFilter() {
-  const raw = (location.hash || '').replace('#', '').toLowerCase().trim();
-  const allowed = new Set(['all','bitcoin','ethereum','solana','defi','payments','regulation']);
-  const tag = raw && allowed.has(raw) ? raw : 'all';
-  const q = document.getElementById('tw-search')?.value || '';
-  filter({ activeTag: tag, q, fromHash: true });
-}
-
-function initTags() {
-  applyHashFilter();
-  window.addEventListener('hashchange', applyHashFilter);
-  document.querySelectorAll('[data-tag]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      const tag = btn.dataset.tag || 'all';
-      const q = document.getElementById('tw-search')?.value || '';
-      filter({ activeTag: tag, q });
-    });
-  });
-}
-
-function withTimeout(fn, ms) {
-  ms = ms || 12000;
-  return new Promise(function(resolve, reject) {
-    var done = false;
-    var timer = setTimeout(function() {
-      done = true;
-      reject(new Error('Request timed out'));
-    }, ms);
-    Promise.resolve()
-      .then(function() { return fn(); })
-      .then(function(val) {
-        if (done) return;
-        clearTimeout(timer);
-        resolve(val);
-      })
-      .catch(function(err) {
-        if (done) return;
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
-}
-
-async function fetchCryptoPanicNews() {
-  var url = 'https://cryptopanic.com/api/v1/posts/?auth_token=free&public=true';
-  return withTimeout(function() {
-    return fetch(url, { headers: { Accept: 'application/json' } })
-      .then(function(res) {
-        if (!res.ok) throw new Error('CryptoPanic HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function(data) {
-        var items = Array.isArray(data && data.posts) ? data.posts : [];
-        if (!items.length) throw new Error('CryptoPanic returned no posts');
-        return items.slice(0, 24).map(function(item) {
-          var category = categoryForNode(item);
-          return {
-            title: item.title || 'Untitled',
-            excerpt: (item.title || '').slice(0, 220),
-            source: 'CryptoPanic',
-            url: item.url || '#',
-            category: category,
-            tags: [category],
-            time: item.published_at || 'recently',
-            img: item.image || '',
-            sourceLabel: 'Live',
-            type: 'news',
-          };
-        });
-      });
-  });
-}
-
-async function fetchCryptoCompareNews() {
-  var target = encodeURIComponent(CRYPTOCOMPARE_NEWS_URL);
-  var proxyUrl = NEWS_PROXY + target;
-  return withTimeout(function() {
-    return fetch(proxyUrl, { headers: { Accept: 'application/json' } })
-      .then(function(res) {
-        if (!res.ok) throw new Error('CryptoCompare proxy HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function(data) {
-        var items = Array.isArray(data && data.data) ? data.data : [];
-        if (!items.length) throw new Error('CryptoCompare returned no news');
-        return items.slice(0, 24).map(function(node) { return normalizeNewsItem(node); });
-      });
-  });
-}
-
-async function fetchLiveCryptoNews() {
-  try {
-    return await fetchCryptoPanicNews();
-  } catch (primaryErr) {
-    console.warn('CryptoPanic failed, falling back to CryptoCompare:', primaryErr && primaryErr.message);
-    return await fetchCryptoCompareNews();
-  }
-}
-
-let TICKER_CACHE = [];
-function initTicker() {
-  var el = document.getElementById('ticker-top');
-  if (!el) return;
-  function render(ticks) {
-    if (!ticks.length) return;
-    el.innerHTML =
-      '<span class="globe-dot" aria-hidden="true"></span>' +
-      ticks
-        .map(function(x) {
-          var m = x.match(/^(.+?)\\s+\\$([\\d,.]+)$/);
-          if (m) {
-            return '&nbsp;<span class="ticker-name">' + esc(m[1]) + '</span>&nbsp;<span class="ticker-price">$' + esc(m[2]) + '</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;';
-          }
-          return '&nbsp;<span class="ticker-item">' + esc(x) + '</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;';
-        })
-        .join('');
-  }
-  renderTrending();
-  var upd = async function() {
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      var res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h');
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      var data = await res.json();
-      var ticks = (Array.isArray(data) ? data : [])
-        .filter(function(c) { return c.current_price != null; })
-        .map(function(c) {
-          return {
-            symbol: c.symbol.toUpperCase(),
-            price: Number(c.current_price),
-            change: Number(c.price_change_percentage_24h || 0),
-          };
-        });
-      TICKER_CACHE = ticks;
-      var ts = ticks.map(function(t) { return t.symbol + ' $' + t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }); });
-      render(ts);
-      renderTrending();
+      return await res.json();
     } catch (err) {
-      render([
-        'BTC $61,400', 'ETH $1,660', 'SOL $81.07', 'BNB $560.41',
-        'XRP $1.09', 'DOGE $0.155', 'ADA $0.45', 'AVAX $18.9',
-        'DOT $6.72', 'LINK $14.2', 'MATIC $0.58', 'LTC $72.4',
-        'BCH $302', 'XLM $0.11', 'ALGO $0.18', 'ATOM $4.55',
-        'VET $0.022', 'FIL $5.68', 'APT $8.33', 'ARB $0.45',
-        'OP $2.12', 'INJ $22.4', 'SUI $2.82', 'PEPE $0.0000114',
-        'SHIB $0.0000158',
-      ]);
+      clearTimeout(id);
+      throw err;
     }
-  };
-  upd();
-  setInterval(upd, 60 * 1000);
-}
-
-async function handleTokenWireSubscribe(e) {
-  e.preventDefault();
-  var form = e.target;
-  var input = form.querySelector('input[type="email"]');
-  var email = (input.value || '').trim();
-  if (!email) return;
-  var btn = form.querySelector('button[type="submit"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Joining...'; }
-  var status = document.getElementById('tw-status');
-  function setStatus(kind, message) {
-    if (!status) return;
-    status.textContent = message;
-    status.style.color = kind === 'success' ? '#7ee787' : '#ff8a8a';
   }
-  var bd = window.__TOKENWIRE_BUTTONDOWN__;
-  if (bd && bd.endpoint) {
+
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      var res = await fetch(bd.endpoint, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: email }),
-      });
-      if (res.ok) {
-        setStatus('success', "You're on the list. Check your inbox to confirm.");
-        input.value = '';
-        return;
-      }
-      var data = await res.json().catch(function() { return {}; });
-      setStatus('error', (data && data.message) || 'Subscription issue. Try again.');
-    } catch {
-      setStatus('error', 'Could not reach newsletter service. Try again.');
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Join'; }
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (err) {
+      clearTimeout(id);
+      throw err;
     }
-    return;
   }
-  var pubId = '7a43efb4-02cb-46cb-96b6-b647b04fe7f8';
-  var url = 'https://www.beehiiv.com/api/v1/public/subscribers/' + pubId + '/add';
-  try {
-    var res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: email, name: '' }),
-    });
-    var data = await res.json();
-    if (data && data.status === 'active') {
-      setStatus('success', "You're on the list. Check your inbox to confirm.");
-      input.value = '';
-    } else {
-      setStatus('error', 'Subscription issue: ' + (data.status || 'try again later'));
-    }
-  } catch {
-    setStatus('error', 'Could not reach newsletter service. Use Subscribe on Beehiiv below.');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Join'; }
+
+  function normalizeCategoryFromText(text) {
+    const t = String(text || '').toLowerCase();
+    if (t.includes('bitcoin') || t.includes('btc')) return 'bitcoin';
+    if (t.includes('ethereum') || t.includes(' eth ')) return 'ethereum';
+    if (t.includes('solana') || t.includes('/sol ') || t.includes(' sol ')) return 'solana';
+    if (t.includes('defi')) return 'defi';
+    if (t.includes('payment') || t.includes('stablecoin') || t.includes('usdc') || t.includes('pay')) return 'payments';
+    if (t.includes('regulat') || t.includes('sec ') || t.includes('law')) return 'regulation';
+    return '';
   }
-}
 
-function initNewsletter() {
-  var form = document.getElementById('tw-newsletter');
-  if (form) form.addEventListener('submit', handleTokenWireSubscribe);
-}
-
-function nowStamp() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function matchesQuery(n, q) {
-  var term = String(q || '').toLowerCase().trim();
-  if (!term) return true;
-  return [n.title, n.excerpt, n.source].some(function(s) { return String(s || '').toLowerCase().indexOf(term) !== -1; });
-}
-
-function matchesTag(n, tag) {
-  var t = String(tag || '').toLowerCase();
-  if (!t || t === 'all') return true;
-  return (
-    String(n.category || '').toLowerCase() === t ||
-    (Array.isArray(n.tags) && n.tags.some(function(tagItem) { return String(tagItem || '').toLowerCase() === t; }))
-  );
-}
-
-function applyFilter(items) {
-  return items.filter(function(n) { return matchesTag(n, activeTag) && matchesQuery(n, activeQuery); });
-}
-
-function renderFiltered(items) {
-  var base = applyFilter(items || NEWS);
-  var sorted = base.slice().sort(function(a, b) { return (a.time || '').localeCompare(b.time || ''); });
-  renderHero(sorted[0] || base[0] || NEWS[0]);
-  renderTopStories(sorted);
-  renderLatest(sorted);
-  renderFeature(sorted);
-}
-
-function setLastUpdated(tsText) {
-  var ts = document.getElementById('live-ts');
-  if (ts) ts.textContent = 'Last updated at ' + (tsText || nowStamp());
-}
-
-async function refreshLiveNews() {
-  var items = await fetchLiveCryptoNews();
-  liveCache = items;
-  liveSourceLabel = 'Live';
-  var status = document.getElementById('feed-status');
-  if (status) {
-    status.textContent = 'Live · via CryptoPanic';
-    status.classList.remove('error');
-  }
-  renderFiltered(items);
-  setLastUpdated();
-}
-
-function showLiveError(message, source) {
-  source = source || '';
-  liveCache = [];
-  liveSourceLabel = source ? 'Fallback ' + source : 'Curated';
-  var fallback = NEWS.slice();
-  renderFiltered(fallback);
-  setLastUpdated();
-  var status = document.getElementById('feed-status');
-  if (status) {
-    status.textContent = message || 'Live news unavailable — showing curated news.';
-    status.classList.add('error');
-  }
-}
-
-async function bootstrapLiveNews() {
-  showLoadingSpinner();
-  try {
-    await withTimeout(function() { return refreshLiveNews(); }, 18000);
-  } catch (err) {
-    console.warn('TokenWire live news failed:', err);
-    showLiveError('Live news failed to load. Showing curated news for now.');
-  }
-  setTimeout(function() {
-    if (!liveCache.length) {
-      showLiveError('Live feed still unavailable. Showing curated news.');
-    }
-  }, 12000);
-}
-
-function filter(state) {
-  var state = state || {};
-  var incoming = state.activeTag || 'all';
-  var q = state.q ? String(state.q).toLowerCase().trim() : '';
-  activeTag = incoming;
-  activeQuery = q;
-
-  var isHashChange = state.fromHash === true;
-  document.querySelectorAll('[data-tag]').forEach(function(btn) { btn.classList.remove('active'); });
-  var target = document.querySelector('[data-tag="' + activeTag + '"]');
-  if (target) target.classList.add('active');
-
-  if (!isHashChange && ('#' + activeTag) !== location.hash) {
-    history.pushState(null, '', '#' + activeTag);
-  }
-  var items = liveCache.length ? liveCache : NEWS;
-  renderFiltered(items);
-}
-
-function initSearch() {
-  var input = document.getElementById('tw-search');
-  var clear = document.getElementById('tw-search-clear');
-  if (!input) return;
-  var apply = function(term) { return filter({ q: term }); };
-  var filterWithCache = function(term) {
-    document.querySelectorAll('[data-tag]').forEach(function(b) { b.classList.remove('active'); });
-    if (clear) clear.style.display = term ? 'inline-flex' : 'none';
-    apply(term || '');
-    if (!term) {
-      var all = document.querySelector('[data-tag="all"]');
-      if (all) all.classList.add('active');
-    }
-  };
-  var t;
-  input.addEventListener('input', function(e) {
-    if (clear) clear.style.display = e.target.value ? 'inline-flex' : 'none';
-    clearTimeout(t);
-    t = setTimeout(function() { return filterWithCache(e.target.value.trim()); }, 120);
-  });
-  if (clear) {
-    clear.addEventListener('click', function() {
-      input.value = '';
-      clear.style.display = 'none';
-      filterWithCache('');
-    });
-    clear.style.display = 'none';
-  }
-}
-
-function initNavLinks() {
-  document.querySelectorAll('.nav-links a[href^="#"]').forEach(function(link) {
-    link.addEventListener('click', function(e) {
-      e.preventDefault();
-      var href = link.getAttribute('href');
-      if (!href || href === '#') return;
-      var target = document.querySelector(href);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        var label = link.textContent.trim().toLowerCase();
-        var fallbackMap = {
-          latest: '#latest-section',
-          'latest news': '#latest-section',
-          topstories: '#topstories-section',
-          'top stories': '#topstories-section',
-          features: '#features',
-        };
-        var mapped = fallbackMap[label];
-        if (mapped) {
-          var mappedTarget = document.querySelector(mapped);
-          if (mappedTarget) mappedTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }
-    });
-  });
-}
-
-function renderTrending() {
-  var root = document.getElementById('trending-list');
-  if (!root) return;
-  var list = TICKER_CACHE.slice(0, 5).map(function(x) {
+  function tagRssItem(item) {
+    const title = String(item.title || '').toLowerCase();
+    const cats = Array.isArray(item.categories) ? item.categories.map(String).join(' ').toLowerCase() : '';
+    const text = title + ' ' + cats;
+    const category = normalizeCategoryFromText(text);
+    const sourceText = String(item.source || '').toLowerCase();
     return {
-      name: x.symbol,
-      price: '$' + x.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }),
-      change: (x.change >= 0 ? '+' : '-') + Math.abs(x.change).toFixed(2) + '%',
+      title: String(item.title || 'Untitled'),
+      url: String(item.link || '#'),
+      source: String(item.source || 'TokenWire'),
+      published_at: String(item.pubDate || new Date().toISOString()),
+      image: String(item.thumbnail || ''),
+      categories: item.categories || [],
+      category
     };
-  });
-  root.innerHTML = list
-    .map(function(n) {
-      return '<div class="trending-item">' +
-        '<span class="trending-name">' + esc(n.name) + '</span>' +
-        '<div>' +
-        '<span class="trending-price">' + esc(n.price) + '</span>' +
-        '<span class="trending-change ' + (n.change.charAt(0) === '+' ? 'up' : 'down') + '">' + esc(n.change) + '</span>' +
-        '</div>' +
-        '</div>';
-    })
-    .join('');
-}
-
-function renderInsights() {
-  var labels = [
-    'Expert Analysis',
-    'On-chain Insights',
-    'Regulation Watch',
-    'DeFi Deep Dive',
-  ];
-  var root = document.querySelector('.widget:nth-child(2) .about-text');
-  if (!root) return;
-  root.textContent = 'TokenWire curates ' + labels[Math.floor(Math.random() * labels.length)] + ' across protocol design, governance risk, and policy shifts.';
-}
-
-async function bootstrap() {
-  try {
-    liveCache = NEWS.slice();
-    liveSourceLabel = 'Curated';
-    renderFiltered(NEWS);
-    setLastUpdated();
-    initTags();
-    initTicker();
-    initNewsletter();
-    initSearch();
-    initNavLinks();
-    bootstrapLiveNews();
-    setInterval(bootstrapLiveNews, 60 * 60 * 1000);
-  } catch (err) {
-    console.error('TokenWire bootstrap failed:', err);
-    var fallback = document.createElement('div');
-    fallback.className = 'container';
-    fallback.style.cssText = 'padding:30px;color:#ff8a8a;text-align:center;';
-    fallback.textContent = 'Loading failed. If it persists, open dev tools (F12) and send me the error.';
-    var main = document.querySelector('main');
-    if (main) main.insertAdjacentElement('afterbegin', fallback);
   }
-}
-bootstrap();
+
+  async function loadRssFeed(feedUrl) {
+    const url = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl);
+    const data = await fetchWithTimeout(url, {}, 14000);
+    const items = Array.isArray(data.items) ? data.items : [];
+    return items.slice(0, 40).map(it => ({
+      ...tagRssItem(it),
+      source: it.source || new URL(feedUrl).hostname.replace(/^www\./, '')
+    }));
+  }
+
+  async function loadRssChain() {
+    const feeds = [
+      'https://cointelegraph.com/rss',
+      'https://coindesk.com/arc/outboundfeeds/rss/',
+      'https://decrypt.co/feed'
+    ];
+    for (const feed of feeds) {
+      try {
+        const items = await loadRssFeed(feed);
+        if (items.length) return items;
+      } catch (e) {
+        console.warn('TokenWire RSS feed failed:', feed, e);
+      }
+    }
+    return [];
+  }
+
+  async function loadNews() {
+    let articles = [];
+    let mode = 'fallback';
+    try {
+      articles = await loadRssChain();
+      if (articles.length) mode = 'live';
+    } catch (e) {
+      console.warn('TokenWire news fetch failed:', e);
+      mode = 'fallback';
+    }
+
+    if (!articles.length) {
+      articles = [{
+        title: 'Live news temporarily unavailable.',
+        url: '#',
+        source: 'TokenWire',
+        published_at: new Date().toISOString(),
+        image: '',
+        categories: [],
+        category: ''
+      }];
+      mode = 'fallback';
+    }
+
+    const cache = { ts: Date.now(), articles, mode };
+    try { localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+
+    updateLiveBadge(mode);
+    renderArticles(articles, getFilter());
+  }
+
+  function getFilter() {
+    const hash = location.hash.replace('#', '').toLowerCase();
+    const valid = ['all','bitcoin','ethereum','solana','defi','payments','regulation'];
+    return valid.includes(hash) ? hash : 'all';
+  }
+
+  function updateLiveBadge(mode) {
+    if (!liveBadge || !liveText) return;
+    liveBadge.className = 'live-badge ' + (mode === 'live' ? 'live' : 'fallback');
+    liveText.textContent = mode === 'live' ? 'Live' : 'Fallback';
+  }
+
+  function setActivePill(filter) {
+    filterPills.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+  }
+
+  async function loadTicker() {
+    let items = [];
+    let source = 'fallback';
+    const fallback = [
+      { id: 'bitcoin', symbol: 'BTC', price: '$64,996.00', change: '+1.84%', up: true },
+      { id: 'ethereum', symbol: 'ETH', price: '$1,884.61', change: '-0.45%', up: false },
+      { id: 'solana', symbol: 'SOL', price: '$75.52', change: '+3.21%', up: true },
+      { id: 'binancecoin', symbol: 'BNB', price: '$566.99', change: '+0.88%', up: true },
+      { id: 'ripple', symbol: 'XRP', price: '$1.11', change: '+2.07%', up: true },
+      { id: 'dogecoin', symbol: 'DOGE', price: '$0.0699', change: '-1.12%', up: false },
+      { id: 'cardano', symbol: 'ADA', price: '$0.1665', change: '+1.02%', up: true },
+      { id: 'avalanche-2', symbol: 'AVAX', price: '$6.26', change: '+2.35%', up: true }
+    ];
+
+    try {
+      const ids = COIN_SLUGS.join(',');
+      const data = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, {}, 14000);
+      items = COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map(coin => ({
+        id: coin.id || slug,
+        symbol: (COIN_MAP[coin.id] || coin.symbol || '').toUpperCase(),
+        price: '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        change: coin.usd_24h_change != null ? (coin.usd_24h_change >= 0 ? '+' : '') + Number(coin.usd_24h_change).toFixed(2) + '%' : '0.00%',
+        up: coin.usd_24h_change == null ? true : coin.usd_24h_change >= 0
+      }));
+      source = items.length ? 'live' : 'fallback';
+    } catch (e) {
+      console.warn('TokenWire ticker fetch failed:', e);
+      items = fallback;
+    }
+
+    const cache = { ts: Date.now(), items, source };
+    try { localStorage.setItem(TICKER_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+
+    renderTicker(items);
+  }
+
+  function renderTicker(items) {
+    const track = document.querySelector('.ticker-track');
+    if (!track) return;
+    const html = items.map(coin => `
+      <span class="ticker-item">${escapeHtml(coin.symbol)} <span class="ticker-price">${escapeHtml(coin.price)}</span></span>
+      <span class="ticker-dot" aria-hidden="true"></span>
+    `).join('');
+    track.innerHTML = html + html;
+  }
+
+  function initFilterBar() {
+    if (!filterBar) return;
+    filterPills.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filter = btn.dataset.filter || 'all';
+        location.hash = filter === 'all' ? '' : filter;
+        setActivePill(filter);
+        const cached = getNewsCache();
+        if (cached && cached.articles) renderArticles(cached.articles, filter);
+      });
+    });
+
+    window.addEventListener('hashchange', () => {
+      const filter = getFilter();
+      setActivePill(filter);
+      const cached = getNewsCache();
+      if (cached && cached.articles) renderArticles(cached.articles, filter);
+    });
+  }
+
+  function getNewsCache() {
+    try {
+      const raw = localStorage.getItem(NEWS_CACHE_KEY);
+      if (!raw) return null;
+      const cache = JSON.parse(raw);
+      if (!cache || !cache.ts || !cache.articles) return null;
+      if (Date.now() - cache.ts > NEWS_TTL_MS) return null;
+      return cache;
+    } catch (e) { return null; }
+  }
+
+  function startPolling() {
+    loadNews();
+    loadTicker();
+    setInterval(loadNews, NEWS_TTL_MS);
+    setInterval(loadTicker, TICKER_TTL_MS);
+  }
+
+  function bootstrap() {
+    initFilterBar();
+    const cached = getNewsCache();
+    if (cached) {
+      renderArticles(cached.articles, getFilter());
+      updateLiveBadge(cached.mode);
+    } else {
+      loadNews();
+    }
+
+    loadTicker();
+    startPolling();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap);
+  } else {
+    bootstrap();
+  }
+})();
