@@ -604,11 +604,16 @@ function showLiveError(message, source) {
 async function bootstrapLiveNews() {
   showLoadingSpinner();
   try {
-    await refreshLiveNews();
+    await withTimeout(function() { return refreshLiveNews(); }, 18000);
   } catch (err) {
     console.warn('TokenWire live news failed:', err);
     showLiveError('Live news failed to load. Showing curated news for now.');
   }
+  setTimeout(function() {
+    if (!liveCache.length) {
+      showLiveError('Live feed still unavailable. Showing curated news.');
+    }
+  }, 12000);
 }
 
 function filter(state) {
