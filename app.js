@@ -60,7 +60,7 @@ const NEWS = [
     title: 'Pump.fun lifetime revenue crosses $800M as weekly buybacks continue',
     excerpt: 'Revenue remains high but growth rate is moderating; more competition from newer Solana consumer apps is emerging.',
     source: 'Tokenomics.com',
-    url: 'https://pump.fun',
+    url: 'https://tokenomics.com',
     category: 'solana',
     tags: ['solana'],
     time: '14 hours ago',
@@ -138,26 +138,26 @@ const CATEGORY_LABELS = {
 let activeTag = 'all';
 let activeQuery = '';
 let liveCache = [];
+let liveSourceLabel = 'Curated';
 
 const CRYPTOCOMPARE_NEWS_URL =
   'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&sortOrder=latest';
 const NEWS_PROXY = 'https://api.allorigins.win/get?url=';
-const RSS_LIVE_FEED =
-  'https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss&count=12';
 
 function esc(s) {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, "&#39;");
 }
 
 function fmtTime(t) { return t || 'recently'; }
 
 function resolveImage(n) {
   const raw = n.img || n.image || '';
-  if (raw && /^https?:\/\//.test(raw)) return raw;
+  if (raw && /^https?:\/\//i.test(raw)) return raw;
   const map = {
     bitcoin: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=1200&q=80',
     ethereum: 'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1200&q=80',
@@ -186,7 +186,7 @@ function normalizeNewsItem(node) {
   const category = categoryForNode(node);
   return {
     title: node.title || 'Untitled',
-    excerpt: (node.body || node.title || '').slice(0, 220),
+    excerpt: (node.body || node.title || '').replace(/<[^>]+>/g, '').slice(0, 220),
     source: node.source || 'CryptoCompare',
     url: node.url || '#',
     category,
@@ -221,7 +221,7 @@ function showLoadingSpinner() {
 function showError(message) {
   const container = document.getElementById('latest');
   if (container)
-    container.innerHTML = `<div class="news-error">⚠️ ${esc(message || 'Could not load the live news feed right now. Please try again soon.')}</div>`;
+    container.innerHTML = '<div class="news-error">' + esc(message || 'Could not load the live news feed right now. Please try again soon.') + '</div>';
 }
 
 function renderHero(item) {
@@ -234,13 +234,11 @@ function renderHero(item) {
   if (!img || !item) return;
 
   const resolved = resolveImage(item);
-  if (resolved) img.style.backgroundImage = `url('${esc(resolved)}')`;
+  if (resolved) img.style.backgroundImage = "url('" + esc(resolved) + "')";
   if (title) title.textContent = item.title;
   if (excerpt) excerpt.textContent = item.excerpt;
-  if (meta) meta.textContent = `${item.source} · ${fmtTime(item.time)}`;
-  if (badge) {
-    badge.textContent = item.sourceLabel || item.source;
-  }
+  if (meta) meta.textContent = item.source + ' · ' + fmtTime(item.time);
+  if (badge) badge.textContent = item.sourceLabel || item.source;
   if (item.url && item.url !== '#') {
     link.href = item.url;
     link.target = '_blank';
@@ -257,14 +255,14 @@ function renderTopStories(items) {
   root.innerHTML = top
     .map(
       (n) =>
-        `<a class="ts-card" href="${esc(n.url || '#')}" target="_blank" rel="noopener">
-        <div class="ts-img" style="background-image:url('${esc(resolveImage(n))}')"></div>
-        <div class="ts-body">
-          <span class="badge">${esc(n.category)}</span>
-          <h4>${esc(n.title)}</h4>
-          <span class="meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
-        </div>
-      </a>`
+        '<a class="ts-card" href="' + esc(n.url || '#') + '" target="_blank" rel="noopener">' +
+        '<div class="ts-img" style="background-image:url(\'' + esc(resolveImage(n)) + '\')"></div>' +
+        '<div class="ts-body">' +
+        '<span class="badge">' + esc(n.category) + '</span>' +
+        '<h4>' + esc(n.title) + '</h4>' +
+        '<span class="meta">' + esc(n.source) + ' · ' + fmtTime(n.time) + '</span>' +
+        '</div>' +
+        '</a>'
     )
     .join('');
 }
@@ -280,10 +278,10 @@ function renderFeature(items) {
   const link = document.getElementById('feature-link');
   const badge = document.getElementById('feature-badge');
 
-  if (img) img.style.backgroundImage = `url('${esc(resolveImage(pick))}')`;
+  if (img) img.style.backgroundImage = "url('" + esc(resolveImage(pick)) + "')";
   if (title) title.textContent = pick.title;
   if (excerpt) excerpt.textContent = pick.excerpt;
-  if (meta) meta.textContent = `${pick.source} · ${fmtTime(pick.time)} · Feature`;
+  if (meta) meta.textContent = pick.source + ' · ' + fmtTime(pick.time) + ' · Feature';
   if (badge) {
     badge.textContent = pick.category ? pick.category.charAt(0).toUpperCase() + pick.category.slice(1) : 'Feature';
     badge.className = 'badge ' + (pick.category || '');
@@ -301,7 +299,7 @@ function renderLatest(items) {
   const root = document.getElementById('latest');
   const count = document.getElementById('latest-count');
   if (!root) return;
-  if (count) count.textContent = `${items.length} articles`;
+  if (count) count.textContent = items.length + ' articles';
   if (!items.length) {
     root.innerHTML = '<div class="news-loading">No articles match this filter yet.</div>';
     return;
@@ -310,15 +308,15 @@ function renderLatest(items) {
   root.innerHTML = list
     .map(
       (n) =>
-        `<a class="list-row" href="${esc(n.url || '#')}" target="_blank" rel="noopener">
-        <div class="list-thumb" style="background-image:url('${esc(resolveImage(n))}')"></div>
-        <div class="list-main">
-          <span class="list-title">${esc(n.title)}</span>
-          <span class="list-meta">${esc(n.source)} · ${fmtTime(n.time)}</span>
-        </div>
-        <span class="badge">${esc(n.category)}</span>
-        ${n.sourceLabel ? `<span class="source-badge">${esc(n.sourceLabel)}</span>` : ''}
-      </a>`
+        '<a class="list-row" href="' + esc(n.url || '#') + '" target="_blank" rel="noopener">' +
+        '<div class="list-thumb" style="background-image:url(\'' + esc(resolveImage(n)) + '\')"></div>' +
+        '<div class="list-main">' +
+        '<span class="list-title">' + esc(n.title) + '</span>' +
+        '<span class="list-meta">' + esc(n.source) + ' · ' + fmtTime(n.time) + '</span>' +
+        '</div>' +
+        '<span class="badge">' + esc(n.category) + '</span>' +
+        (n.sourceLabel ? '<span class="source-badge">' + esc(n.sourceLabel) + '</span>' : '') +
+        '</a>'
     )
     .join('');
 }
@@ -344,42 +342,123 @@ function initTags() {
   });
 }
 
+function withTimeout(fn, ms) {
+  ms = ms || 12000;
+  return new Promise(function(resolve, reject) {
+    var done = false;
+    var timer = setTimeout(function() {
+      done = true;
+      reject(new Error('Request timed out'));
+    }, ms);
+    Promise.resolve()
+      .then(function() { return fn(); })
+      .then(function(val) {
+        if (done) return;
+        clearTimeout(timer);
+        resolve(val);
+      })
+      .catch(function(err) {
+        if (done) return;
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+async function fetchCryptoPanicNews() {
+  var url = 'https://cryptopanic.com/api/v1/posts/?auth_token=free&public=true';
+  return withTimeout(function() {
+    return fetch(url, { headers: { Accept: 'application/json' } })
+      .then(function(res) {
+        if (!res.ok) throw new Error('CryptoPanic HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        var items = Array.isArray(data && data.posts) ? data.posts : [];
+        if (!items.length) throw new Error('CryptoPanic returned no posts');
+        return items.slice(0, 24).map(function(item) {
+          var category = categoryForNode(item);
+          return {
+            title: item.title || 'Untitled',
+            excerpt: (item.title || '').slice(0, 220),
+            source: 'CryptoPanic',
+            url: item.url || '#',
+            category: category,
+            tags: [category],
+            time: item.published_at || 'recently',
+            img: item.image || '',
+            sourceLabel: 'Live',
+            type: 'news',
+          };
+        });
+      });
+  });
+}
+
+async function fetchCryptoCompareNews() {
+  var target = encodeURIComponent(CRYPTOCOMPARE_NEWS_URL);
+  var proxyUrl = NEWS_PROXY + target;
+  return withTimeout(function() {
+    return fetch(proxyUrl, { headers: { Accept: 'application/json' } })
+      .then(function(res) {
+        if (!res.ok) throw new Error('CryptoCompare proxy HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        var items = Array.isArray(data && data.data) ? data.data : [];
+        if (!items.length) throw new Error('CryptoCompare returned no news');
+        return items.slice(0, 24).map(function(node) { return normalizeNewsItem(node); });
+      });
+  });
+}
+
+async function fetchLiveCryptoNews() {
+  try {
+    return await fetchCryptoPanicNews();
+  } catch (primaryErr) {
+    console.warn('CryptoPanic failed, falling back to CryptoCompare:', primaryErr && primaryErr.message);
+    return await fetchCryptoCompareNews();
+  }
+}
+
 let TICKER_CACHE = [];
 function initTicker() {
-  const el = document.getElementById('ticker-top');
+  var el = document.getElementById('ticker-top');
   if (!el) return;
-  const render = (ticks) => {
+  function render(ticks) {
     if (!ticks.length) return;
     el.innerHTML =
-      '&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;'.repeat(6) +
+      '<span class="globe-dot" aria-hidden="true"></span>' +
       ticks
-        .map((x) => {
-          const m = x.match(/^(.+?)\s+\$([\d,.]+)$/);
+        .map(function(x) {
+          var m = x.match(/^(.+?)\\s+\\$([\\d,.]+)$/);
           if (m) {
-            return `&nbsp;<span class="ticker-name">${esc(m[1])}</span>&nbsp;<span class="ticker-price">$${esc(m[2])}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
+            return '&nbsp;<span class="ticker-name">' + esc(m[1]) + '</span>&nbsp;<span class="ticker-price">$' + esc(m[2]) + '</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;';
           }
-          return `&nbsp;<span class="ticker-item">${esc(x)}</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;`;
+          return '&nbsp;<span class="ticker-item">' + esc(x) + '</span>&nbsp;<span class="ticker-dot">&#9679;</span>&nbsp;';
         })
         .join('');
-  };
+  }
   renderTrending();
-  const upd = async () => {
+  var upd = async function() {
     try {
-      const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h');
+      var res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h');
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const ticks = (Array.isArray(data) ? data : [])
-        .filter((c) => c.current_price != null)
-        .map((c) => ({
-          symbol: c.symbol.toUpperCase(),
-          price: Number(c.current_price),
-          change: Number(c.price_change_percentage_24h || 0),
-        }));
+      var data = await res.json();
+      var ticks = (Array.isArray(data) ? data : [])
+        .filter(function(c) { return c.current_price != null; })
+        .map(function(c) {
+          return {
+            symbol: c.symbol.toUpperCase(),
+            price: Number(c.current_price),
+            change: Number(c.price_change_percentage_24h || 0),
+          };
+        });
       TICKER_CACHE = ticks;
-      const ts = ticks.map((t) => `${t.symbol} $${t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`);
+      var ts = ticks.map(function(t) { return t.symbol + ' $' + t.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }); });
       render(ts);
       renderTrending();
-    } catch {
+    } catch (err) {
       render([
         'BTC $61,400', 'ETH $1,660', 'SOL $81.07', 'BNB $560.41',
         'XRP $1.09', 'DOGE $0.155', 'ADA $0.45', 'AVAX $18.9',
@@ -397,32 +476,32 @@ function initTicker() {
 
 async function handleTokenWireSubscribe(e) {
   e.preventDefault();
-  const form = e.target;
-  const input = form.querySelector('input[type="email"]');
-  const email = (input.value || '').trim();
+  var form = e.target;
+  var input = form.querySelector('input[type="email"]');
+  var email = (input.value || '').trim();
   if (!email) return;
-  const btn = form.querySelector('button[type="submit"]');
+  var btn = form.querySelector('button[type="submit"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Joining...'; }
-  const status = document.getElementById('tw-status');
-  const setStatus = (kind, message) => {
+  var status = document.getElementById('tw-status');
+  function setStatus(kind, message) {
     if (!status) return;
     status.textContent = message;
     status.style.color = kind === 'success' ? '#7ee787' : '#ff8a8a';
-  };
-  const bd = window.__TOKENWIRE_BUTTONDOWN__;
+  }
+  var bd = window.__TOKENWIRE_BUTTONDOWN__;
   if (bd && bd.endpoint) {
     try {
-      const res = await fetch(bd.endpoint, {
+      var res = await fetch(bd.endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email }),
       });
       if (res.ok) {
         setStatus('success', "You're on the list. Check your inbox to confirm.");
         input.value = '';
         return;
       }
-      const data = await res.json().catch(() => ({}));
+      var data = await res.json().catch(function() { return {}; });
       setStatus('error', (data && data.message) || 'Subscription issue. Try again.');
     } catch {
       setStatus('error', 'Could not reach newsletter service. Try again.');
@@ -431,15 +510,15 @@ async function handleTokenWireSubscribe(e) {
     }
     return;
   }
-  const pubId = '7a43efb4-02cb-46cb-96b6-b647b04fe7f8';
-  const url = `https://www.beehiiv.com/api/v1/public/subscribers/${pubId}/add`;
+  var pubId = '7a43efb4-02cb-46cb-96b6-b647b04fe7f8';
+  var url = 'https://www.beehiiv.com/api/v1/public/subscribers/' + pubId + '/add';
   try {
-    const res = await fetch(url, {
+    var res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, name: '' }),
+      body: JSON.stringify({ email: email, name: '' }),
     });
-    const data = await res.json();
+    var data = await res.json();
     if (data && data.status === 'active') {
       setStatus('success', "You're on the list. Check your inbox to confirm.");
       input.value = '';
@@ -454,7 +533,7 @@ async function handleTokenWireSubscribe(e) {
 }
 
 function initNewsletter() {
-  const form = document.getElementById('tw-newsletter');
+  var form = document.getElementById('tw-newsletter');
   if (form) form.addEventListener('submit', handleTokenWireSubscribe);
 }
 
@@ -463,25 +542,27 @@ function nowStamp() {
 }
 
 function matchesQuery(n, q) {
-  const term = String(q || '').toLowerCase().trim();
+  var term = String(q || '').toLowerCase().trim();
   if (!term) return true;
-  return [n.title, n.excerpt, n.source].some((s) => String(s || '').toLowerCase().includes(term));
+  return [n.title, n.excerpt, n.source].some(function(s) { return String(s || '').toLowerCase().indexOf(term) !== -1; });
 }
+
 function matchesTag(n, tag) {
-  const t = String(tag || '').toLowerCase();
+  var t = String(tag || '').toLowerCase();
   if (!t || t === 'all') return true;
   return (
     String(n.category || '').toLowerCase() === t ||
-    (Array.isArray(n.tags) && n.tags.some((tagItem) => String(tagItem || '').toLowerCase() === t))
+    (Array.isArray(n.tags) && n.tags.some(function(tagItem) { return String(tagItem || '').toLowerCase() === t; }))
   );
 }
+
 function applyFilter(items) {
-  return items.filter((n) => matchesTag(n, activeTag) && matchesQuery(n, activeQuery));
+  return items.filter(function(n) { return matchesTag(n, activeTag) && matchesQuery(n, activeQuery); });
 }
 
 function renderFiltered(items) {
-  const base = applyFilter(items || NEWS);
-  const sorted = base.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  var base = applyFilter(items || NEWS);
+  var sorted = base.slice().sort(function(a, b) { return (a.time || '').localeCompare(b.time || ''); });
   renderHero(sorted[0] || base[0] || NEWS[0]);
   renderTopStories(sorted);
   renderLatest(sorted);
@@ -489,53 +570,31 @@ function renderFiltered(items) {
 }
 
 function setLastUpdated(tsText) {
-  const ts = document.getElementById('live-ts');
-  if (ts) ts.textContent = `Last updated at ${tsText || nowStamp()}`;
-}
-
-async function fetchLiveCryptoNews() {
-  const res = await fetch(RSS_LIVE_FEED);
-  if (!res.ok) throw new Error(`RSS feed failed: HTTP ${res.status}`);
-  const data = await res.json();
-  const items = Array.isArray(data?.items) ? data.items : [];
-  if (!items.length) throw new Error('RSS returned no items.');
-
-  const mapped = items.slice(0, 12).map((item, index) => {
-    const category = categoryForNode(item);
-    const published = item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString();
-    const thumbnail = item.thumbnail || item.enclosure?.link || '';
-    return {
-      title: item.title || 'Untitled',
-      excerpt: (item.description || item.title || '').replace(/<[^>]+>/g, '').slice(0, 220),
-      source: 'Cointelegraph',
-      url: item.link || '#',
-      category,
-      tags: [category],
-      time: published,
-      img: thumbnail,
-      sourceLabel: 'Live',
-      type: index === 0 ? 'feature' : 'news',
-    };
-  });
-
-  return mapped;
+  var ts = document.getElementById('live-ts');
+  if (ts) ts.textContent = 'Last updated at ' + (tsText || nowStamp());
 }
 
 async function refreshLiveNews() {
-  const items = await fetchLiveCryptoNews();
+  var items = await fetchLiveCryptoNews();
   liveCache = items;
-  const ts = document.getElementById('live-ts');
-  if (ts) ts.dataset.fallback = '0';
+  liveSourceLabel = 'Live';
+  var status = document.getElementById('feed-status');
+  if (status) {
+    status.textContent = 'Live · via CryptoPanic';
+    status.classList.remove('error');
+  }
   renderFiltered(items);
   setLastUpdated();
 }
 
-function showLiveError(message) {
+function showLiveError(message, source) {
+  source = source || '';
   liveCache = [];
-  const fallback = [...NEWS];
+  liveSourceLabel = source ? 'Fallback ' + source : 'Curated';
+  var fallback = NEWS.slice();
   renderFiltered(fallback);
   setLastUpdated();
-  const status = document.getElementById('feed-status');
+  var status = document.getElementById('feed-status');
   if (status) {
     status.textContent = message || 'Live news unavailable — showing curated news.';
     status.classList.add('error');
@@ -553,43 +612,46 @@ async function bootstrapLiveNews() {
 }
 
 function filter(state) {
-  const incoming = state?.activeTag || 'all';
-  const q = state?.q ? String(state.q).toLowerCase().trim() : '';
+  var state = state || {};
+  var incoming = state.activeTag || 'all';
+  var q = state.q ? String(state.q).toLowerCase().trim() : '';
   activeTag = incoming;
   activeQuery = q;
 
-  const isHashChange = state?.fromHash === true;
-  document.querySelectorAll('[data-tag]').forEach((btn) => btn.classList.remove('active'));
-  const target = document.querySelector(`[data-tag="${CSS.escape(activeTag)}"]`);
+  var isHashChange = state.fromHash === true;
+  document.querySelectorAll('[data-tag]').forEach(function(btn) { btn.classList.remove('active'); });
+  var target = document.querySelector('[data-tag="' + activeTag + '"]');
   if (target) target.classList.add('active');
 
-  if (!isHashChange && location.hash !== `#${activeTag}`) {
-    history.pushState(null, '', `#${activeTag}`);
+  if (!isHashChange && ('#' + activeTag) !== location.hash) {
+    history.pushState(null, '', '#' + activeTag);
   }
-  const items = liveCache.length ? liveCache : NEWS;
+  var items = liveCache.length ? liveCache : NEWS;
   renderFiltered(items);
 }
 
 function initSearch() {
-  const input = document.getElementById('tw-search');
-  const clear = document.getElementById('tw-search-clear');
-  const root = document.getElementById('latest');
+  var input = document.getElementById('tw-search');
+  var clear = document.getElementById('tw-search-clear');
   if (!input) return;
-  const apply = (term) => filter({ q: term });
-  const filterWithCache = (term) => {
-    document.querySelectorAll('[data-tag]').forEach((b) => b.classList.remove('active'));
+  var apply = function(term) { return filter({ q: term }); };
+  var filterWithCache = function(term) {
+    document.querySelectorAll('[data-tag]').forEach(function(b) { b.classList.remove('active'); });
     if (clear) clear.style.display = term ? 'inline-flex' : 'none';
     apply(term || '');
-    if (!term) document.querySelector('[data-tag="all"]')?.classList.add('active');
+    if (!term) {
+      var all = document.querySelector('[data-tag="all"]');
+      if (all) all.classList.add('active');
+    }
   };
-  let t;
-  input.addEventListener('input', (e) => {
+  var t;
+  input.addEventListener('input', function(e) {
     if (clear) clear.style.display = e.target.value ? 'inline-flex' : 'none';
     clearTimeout(t);
-    t = setTimeout(() => filterWithCache(e.target.value.trim()), 120);
+    t = setTimeout(function() { return filterWithCache(e.target.value.trim()); }, 120);
   });
   if (clear) {
-    clear.addEventListener('click', () => {
+    clear.addEventListener('click', function() {
       input.value = '';
       clear.style.display = 'none';
       filterWithCache('');
@@ -599,26 +661,26 @@ function initSearch() {
 }
 
 function initNavLinks() {
-  document.querySelectorAll('.nav-links a[href^="#"]').forEach((link) => {
-    link.addEventListener('click', (e) => {
+  document.querySelectorAll('.nav-links a[href^="#"]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
       e.preventDefault();
-      const href = link.getAttribute('href');
+      var href = link.getAttribute('href');
       if (!href || href === '#') return;
-      const target = document.querySelector(href);
+      var target = document.querySelector(href);
       if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
-        const label = link.textContent.trim().toLowerCase();
-        const fallbackMap = {
+        var label = link.textContent.trim().toLowerCase();
+        var fallbackMap = {
           latest: '#latest-section',
           'latest news': '#latest-section',
           topstories: '#topstories-section',
           'top stories': '#topstories-section',
           features: '#features',
         };
-        const mapped = fallbackMap[label];
+        var mapped = fallbackMap[label];
         if (mapped) {
-          const mappedTarget = document.querySelector(mapped);
+          var mappedTarget = document.querySelector(mapped);
           if (mappedTarget) mappedTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       }
@@ -627,47 +689,46 @@ function initNavLinks() {
 }
 
 function renderTrending() {
-  const root = document.getElementById('trending-list');
+  var root = document.getElementById('trending-list');
   if (!root) return;
-  const list = TICKER_CACHE.slice(0, 5).map((x) => ({
-    name: x.symbol,
-    price: `$${x.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}`,
-    change: `${x.change >= 0 ? '+' : ''}${x.change.toFixed(2)}%`,
-  }));
+  var list = TICKER_CACHE.slice(0, 5).map(function(x) {
+    return {
+      name: x.symbol,
+      price: '$' + x.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 }),
+      change: (x.change >= 0 ? '+' : '-') + Math.abs(x.change).toFixed(2) + '%',
+    };
+  });
   root.innerHTML = list
-    .map(
-      (n) =>
-        `<div class="trending-item">
-        <span class="trending-name">${esc(n.name)}</span>
-        <div>
-          <span class="trending-price">${esc(n.price)}</span>
-          <span class="trending-change ${n.change.startsWith('+') ? 'up' : 'down'}">${esc(n.change)}</span>
-        </div>
-      </div>`
-    )
+    .map(function(n) {
+      return '<div class="trending-item">' +
+        '<span class="trending-name">' + esc(n.name) + '</span>' +
+        '<div>' +
+        '<span class="trending-price">' + esc(n.price) + '</span>' +
+        '<span class="trending-change ' + (n.change.charAt(0) === '+' ? 'up' : 'down') + '">' + esc(n.change) + '</span>' +
+        '</div>' +
+        '</div>';
+    })
     .join('');
 }
 
 function renderInsights() {
-  const labels = [
+  var labels = [
     'Expert Analysis',
     'On-chain Insights',
     'Regulation Watch',
     'DeFi Deep Dive',
   ];
-  const root = document.querySelector('.widget:nth-child(2) .about-text');
+  var root = document.querySelector('.widget:nth-child(2) .about-text');
   if (!root) return;
-  root.textContent = `TokenWire curates ${labels[Math.floor(Math.random() * labels.length)]} across protocol design, governance risk, and policy shifts.`;
+  root.textContent = 'TokenWire curates ' + labels[Math.floor(Math.random() * labels.length)] + ' across protocol design, governance risk, and policy shifts.';
 }
 
 async function bootstrap() {
   try {
-    renderHero(NEWS[0]);
-    renderTopStories(NEWS);
-    renderFeature(NEWS);
-    renderLatest(NEWS);
-    renderTrending();
-    renderInsights();
+    liveCache = NEWS.slice();
+    liveSourceLabel = 'Curated';
+    renderFiltered(NEWS);
+    setLastUpdated();
     initTags();
     initTicker();
     initNewsletter();
@@ -677,11 +738,12 @@ async function bootstrap() {
     setInterval(bootstrapLiveNews, 60 * 60 * 1000);
   } catch (err) {
     console.error('TokenWire bootstrap failed:', err);
-    const fallback = document.createElement('div');
+    var fallback = document.createElement('div');
     fallback.className = 'container';
     fallback.style.cssText = 'padding:30px;color:#ff8a8a;text-align:center;';
     fallback.textContent = 'Loading failed. If it persists, open dev tools (F12) and send me the error.';
-    document.querySelector('main')?.insertAdjacentElement('afterbegin', fallback);
+    var main = document.querySelector('main');
+    if (main) main.insertAdjacentElement('afterbegin', fallback);
   }
 }
 bootstrap();
