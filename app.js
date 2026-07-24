@@ -150,29 +150,38 @@
     }
   }
 
+  const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%239945ff'/%3E%3Cstop offset='100%25' stop-color='%2314f195'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='400' height='200' fill='url(%23g)'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-family='Inter,Arial,sans-serif' font-weight='800' font-size='48' fill='white'%3ETW%3C/text%3E%3C/svg%3E";
+
+  function extractImage(item) {
+    if (item.enclosure && item.enclosure.link) return String(item.enclosure.link);
+    if (item.thumbnail) return String(item.thumbnail);
+    if (item.enclosure && item.enclosure.url) return String(item.enclosure.url);
+    return String(PLACEHOLDER_IMG);
+  }
+
   function normalizeCategoryFromText(text) {
     const t = String(text || '').toLowerCase();
-    if (t.includes('bitcoin') || t.includes('btc')) return 'bitcoin';
-    if (t.includes('ethereum') || t.includes(' eth ')) return 'ethereum';
-    if (t.includes('solana') || t.includes('/sol ') || t.includes(' sol ')) return 'solana';
-    if (t.includes('defi')) return 'defi';
-    if (t.includes('payment') || t.includes('stablecoin') || t.includes('usdc') || t.includes('pay')) return 'payments';
-    if (t.includes('regulat') || t.includes('sec ') || t.includes('law')) return 'regulation';
+    if (t.includes('bitcoin') || t.includes('btc') || t.includes('₿')) return 'bitcoin';
+    if (t.includes('ethereum') || t.includes('eth') || t.includes('ether')) return 'ethereum';
+    if (t.includes('solana') || t.includes('sol ')) return 'solana';
+    if (t.includes('defi') || t.includes('decentralized finance')) return 'defi';
+    if (t.includes('payment') || t.includes('stablecoin') || t.includes('usdc') || t.includes('usdt')) return 'payments';
+    if (t.includes('regulat') || t.includes('sec') || t.includes('legislation') || t.includes('law') || t.includes('ban')) return 'regulation';
     return '';
   }
 
   function tagRssItem(item) {
-    const title = String(item.title || '').toLowerCase();
-    const cats = Array.isArray(item.categories) ? item.categories.map(String).join(' ').toLowerCase() : '';
-    const text = title + ' ' + cats;
+    const title = String(item.title || '');
+    const description = String(item.description || '');
+    const cats = Array.isArray(item.categories) ? item.categories.map(String).join(' ') : '';
+    const text = title + ' ' + description + ' ' + cats;
     const category = normalizeCategoryFromText(text);
-    const sourceText = String(item.source || '').toLowerCase();
     return {
-      title: String(item.title || 'Untitled'),
+      title: title || 'Untitled',
       url: String(item.link || '#'),
       source: String(item.source || 'TokenWire'),
       published_at: String(item.pubDate || new Date().toISOString()),
-      image: String(item.thumbnail || ''),
+      image: extractImage(item),
       categories: item.categories || [],
       category
     };
