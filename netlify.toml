@@ -15,7 +15,7 @@
   force = false
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/markets.js"
+  to = "/markets.js"
   status = 200
-  force = true
+  force = false
