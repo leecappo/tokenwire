@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TokenWire — Crypto News</title>
+  <meta name="author" content="TokenWire">
+  <meta name="copyright" content="© 2026 TokenWire">
   <meta name="description" content="TokenWire is a Solana-inspired crypto news aggregator with live markets, real-time updates, and expert analysis." />
   <meta name="theme-color" content="#0b0d14" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -49,8 +51,6 @@
       <span class="ticker-item">AVAX <span class="ticker-price">$6.26</span></span>
       <span class="ticker-dot" aria-hidden="true"></span>
     </div>
-  </div>
-
   <div class="filter-bar">
     <div class="container">
       <button class="filter-pill active" data-filter="all">#All</button>
@@ -61,6 +61,7 @@
       <button class="filter-pill" data-filter="payments">#Payments</button>
       <button class="filter-pill" data-filter="regulation">#Regulation</button>
       <span id="tw-live-badge" class="live-badge" aria-live="polite"><span id="tw-live-text">Loading</span></span>
+      <span class="disclaimer-badge" aria-label="Not financial advice">Not financial advice</span>
     </div>
   </div>
 
@@ -346,7 +347,8 @@
         </div>
       </div>
       <div class="footer-bottom">
-        <span>TokenWire · News & analysis · Prices via CoinGecko</span>
+        <div>© 2026 TokenWire. All rights reserved.</div>
+        <div class="legal-notice">TokenWire aggregates news from third-party sources. All article content belongs to the original publishers. Prices provided by CoinGecko. TokenWire is not a financial advisor — nothing on this site constitutes financial advice.</div>
       </div>
     </div>
   </footer>

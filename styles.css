@@ -754,6 +754,34 @@ main {
   color: var(--muted);
 }
 
+.legal-notice {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.disclaimer-badge {
+  display: inline-block;
+  margin-left: 16px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 183, 77, 0.35);
+  background: rgba(255, 183, 77, 0.08);
+  color: #ffb74d;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+@media (max-width: 720px) {
+  .disclaimer-badge {
+    display: block;
+    margin-left: 0;
+    margin-top: 10px;
+  }
+}
+
 /* Social links */
 .social-links {
   display: flex;
