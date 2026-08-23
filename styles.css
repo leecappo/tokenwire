@@ -276,7 +276,7 @@ a:hover { text-decoration: underline; }
 
 /* Main */
 main {
-  padding-top: calc(var(--header-height) + 40px);
+  /* padding removed so hero sits directly below filter bar */
 }
 
 /* Hero */

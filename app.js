@@ -338,7 +338,16 @@
   function renderTicker(items) {
     const track = document.querySelector('.ticker-track');
     if (!track) return;
-    const html = items.map(coin => `
+    const seen = new Set();
+    const unique = [];
+    for (const coin of items) {
+      const key = String(coin.symbol || '').toUpperCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(coin);
+      }
+    }
+    const html = unique.map(coin => `
       <span class="ticker-item">${escapeHtml(coin.symbol)} <span class="ticker-price">${escapeHtml(coin.price)}</span></span>
       <span class="ticker-dot" aria-hidden="true"></span>
     `).join('');
