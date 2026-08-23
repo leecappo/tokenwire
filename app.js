@@ -315,8 +315,8 @@
     try {
       const ids = SIDEBAR_COIN_SLUGS.join(',');
       const data = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, {}, 20000);
-      items = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map(coin => ({
-        id: coin.id || slug,
+      items = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map((coin, idx) => ({
+        id: coin.id || SIDEBAR_COIN_SLUGS[idx],
         symbol: (COIN_MAP[coin.id] || coin.symbol || '').toUpperCase(),
         price: '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         change: coin.usd_24h_change != null ? (coin.usd_24h_change >= 0 ? '+' : '') + Number(coin.usd_24h_change).toFixed(2) + '%' : '0.00%',
