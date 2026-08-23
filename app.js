@@ -66,7 +66,7 @@
     const bg = img ? `url('${escapeHtml(img)}')` : "linear-gradient(135deg, #9945ff, #14f195)";
     if (heroImg) heroImg.style.backgroundImage = bg;
     if (heroTitle) heroTitle.textContent = article.title || '';
-    if (heroExcerpt) heroExcerpt.textContent = '';
+    if (heroExcerpt) heroExcerpt.textContent = article.excerpt || '';
     if (heroMeta) heroMeta.textContent = `${escapeHtml(article.source || 'TokenWire')} · ${article.published_at ? new Date(article.published_at).toLocaleString() : ''}`;
     if (heroLink) {
       heroLink.href = article.url || '#';
