@@ -6,6 +6,7 @@
   const TICKER_TTL_MS = 5 * 60 * 1000;
 
   const COIN_SLUGS = ['bitcoin','ethereum','solana','binancecoin','ripple','dogecoin','cardano','avalanche-2'];
+  const SIDEBAR_COIN_SLUGS = ['bitcoin','ethereum','solana'];
   const COIN_MAP = { bitcoin:'BTC', ethereum:'ETH', solana:'SOL', 'binancecoin':'BNB', ripple:'XRP', dogecoin:'DOGE', cardano:'ADA', 'avalanche-2':'AVAX' };
 
   const SECTIONS = {
@@ -19,8 +20,79 @@
   const liveBadge = document.getElementById('tw-live-badge');
   const liveText = document.getElementById('tw-live-text');
 
+  const heroImg = document.getElementById('hero-img');
+  const heroTitle = document.getElementById('hero-title');
+  const heroExcerpt = document.getElementById('hero-excerpt');
+  const heroMeta = document.getElementById('hero-meta');
+  const heroLink = document.getElementById('hero-link');
+  const heroBadge = document.getElementById('hero-badge');
+
+  const sidebarMarkets = document.querySelector('#sidebar-markets');
+
   function qs(selector, root = document) { return root.querySelector(selector); }
   function qsa(selector, root = document) { return Array.from(root.querySelectorAll(selector)); }
+
+  function escapeHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function normalizeCategory(category) {
+    const c = String(category || '').toLowerCase();
+    const map = { bitcoin:'bitcoin', ethereum:'ethereum', solana:'solana', defi:'defi', payments:'payments', regulation:'regulation' };
+    return map[c] || '';
+  }
+
+  function tagCategory(item) {
+    if (!item) return '';
+    if (item.categories && item.categories[0]) {
+      const cat = item.categories[0].title || item.categories[0].slug || '';
+      const norm = normalizeCategory(cat);
+      if (norm) return norm;
+    }
+    const title = (item.title || '').toLowerCase();
+    const source = (item.source || '').toLowerCase();
+    if (title.includes('bitcoin') || source.includes('bitcoin')) return 'bitcoin';
+    if (title.includes('ethereum') || source.includes('ethereum')) return 'ethereum';
+    if (title.includes('solana') || source.includes('solana')) return 'solana';
+    if (title.includes('defi') || title.includes('jupiter') || title.includes('marinade')) return 'defi';
+    if (title.includes('payment') || title.includes('stablecoin') || title.includes('usdc')) return 'payments';
+    if (title.includes('sec') || title.includes('regulation') || title.includes('treasury')) return 'regulation';
+    return '';
+  }
+
+  function updateHero(article) {
+    if (!article) return;
+    const img = article.image || '';
+    const bg = img ? `url('${escapeHtml(img)}')` : "linear-gradient(135deg, #9945ff, #14f195)";
+    if (heroImg) heroImg.style.backgroundImage = bg;
+    if (heroTitle) heroTitle.textContent = article.title || '';
+    if (heroExcerpt) heroExcerpt.textContent = '';
+    if (heroMeta) heroMeta.textContent = `${escapeHtml(article.source || 'TokenWire')} · ${article.published_at ? new Date(article.published_at).toLocaleString() : ''}`;
+    if (heroLink) {
+      heroLink.href = article.url || '#';
+      heroLink.target = '_blank';
+      heroLink.rel = 'noopener';
+    }
+    if (heroBadge) heroBadge.textContent = article.category ? article.category.charAt(0).toUpperCase() + article.category.slice(1) : 'News';
+  }
+
+  function updateSidebarMarkets(items) {
+    if (!sidebarMarkets) return;
+    if (!items || !items.length) {
+      sidebarMarkets.innerHTML = '<div class="about-text">Market data temporarily unavailable.</div>';
+      return;
+    }
+    const rows = items.slice(0, 3).map(coin => `
+      <div class="trending-item">
+        <span class="trending-name">${escapeHtml(coin.symbol)}</span>
+        <div>
+          <span class="trending-price">${escapeHtml(coin.price)}</span>
+          <span class="trending-change ${coin.up ? 'up' : 'down'}">${escapeHtml(coin.change)}</span>
+        </div>
+      </div>
+    `).join('');
+    sidebarMarkets.innerHTML = rows;
+  }
 
   function createCard(item, type) {
     const link = item.url || '#';
@@ -64,39 +136,10 @@
     return article;
   }
 
-  function escapeHtml(str) {
-    return String(str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
-
-  function normalizeCategory(category) {
-    const c = String(category || '').toLowerCase();
-    const map = { bitcoin:'bitcoin', ethereum:'ethereum', solana:'solana', defi:'defi', payments:'payments', regulation:'regulation' };
-    return map[c] || '';
-  }
-
-  function tagCategory(item) {
-    if (!item) return '';
-    if (item.categories && item.categories[0]) {
-      const cat = item.categories[0].title || item.categories[0].slug || '';
-      const norm = normalizeCategory(cat);
-      if (norm) return norm;
-    }
-    const title = (item.title || '').toLowerCase();
-    const source = (item.source || '').toLowerCase();
-    if (title.includes('bitcoin') || source.includes('bitcoin')) return 'bitcoin';
-    if (title.includes('ethereum') || source.includes('ethereum')) return 'ethereum';
-    if (title.includes('solana') || source.includes('solana')) return 'solana';
-    if (title.includes('defi') || title.includes('jupiter') || title.includes('marinade')) return 'defi';
-    if (title.includes('payment') || title.includes('stablecoin') || title.includes('usdc')) return 'payments';
-    if (title.includes('sec') || title.includes('regulation') || title.includes('treasury')) return 'regulation';
-    return '';
-  }
-
   function renderArticles(articles, filter) {
     const filterValue = (filter || 'all').toLowerCase();
     const items = articles.map(a => ({ ...a, category: tagCategory(a) }));
 
-    // Top stories: pick first 3 matching items
     const topData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(0, 3);
     if (SECTIONS.topstories) {
       SECTIONS.topstories.innerHTML = '';
@@ -104,7 +147,6 @@
       else SECTIONS.topstories.innerHTML = '<div class="muted">No articles right now.</div>';
     }
 
-    // Features: pick next 3 matching items
     const featureStart = topData.length ? 3 : 0;
     const featureData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(featureStart, featureStart + 3);
     if (SECTIONS.features) {
@@ -113,37 +155,25 @@
       else SECTIONS.features.innerHTML = '<div class="muted">No articles right now.</div>';
     }
 
-    // Latest: up to 11
     const latestData = items.filter(it => filterValue === 'all' || it.category === filterValue).slice(0, 11);
     if (SECTIONS.latest) {
       SECTIONS.latest.innerHTML = '';
       if (latestData.length) latestData.forEach(it => SECTIONS.latest.appendChild(createCard(it, 'list')));
       else SECTIONS.latest.innerHTML = '<div class="muted">No articles right now.</div>';
     }
+
+    if (topData.length) updateHero(topData[0]);
   }
 
-  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const res = await fetch(url, { ...options, signal: controller.signal });
       clearTimeout(id);
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
-    } catch (err) {
-      clearTimeout(id);
-      throw err;
-    }
-  }
-
-  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(id);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
+      const data = await res.json();
+      return data;
     } catch (err) {
       clearTimeout(id);
       throw err;
@@ -189,11 +219,15 @@
 
   async function loadRssFeed(feedUrl) {
     const url = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl);
-    const data = await fetchWithTimeout(url, {}, 14000);
+    const data = await fetchWithTimeout(url, {}, 20000);
+    if (!data || data.status !== 'ok') {
+      console.warn('TokenWire rss2json status not ok:', data && data.status, feedUrl);
+      return [];
+    }
     const items = Array.isArray(data.items) ? data.items : [];
     return items.slice(0, 40).map(it => ({
       ...tagRssItem(it),
-      source: it.source || new URL(feedUrl).hostname.replace(/^www\./, '')
+      source: it.source || new URL(feedUrl).hostname.replace(/^www\\./, '')
     }));
   }
 
@@ -201,9 +235,15 @@
     const feeds = [
       'https://cointelegraph.com/rss',
       'https://coindesk.com/arc/outboundfeeds/rss/',
-      'https://decrypt.co/feed'
+      'https://decrypt.co/feed',
+      'https://cryptopotato.com/feed/',
+      'https://www.coindesk.com/arc/outboundfeeds/rss/',
+      'https://cointelegraph.com/rss'
     ];
+    const seen = new Set();
     for (const feed of feeds) {
+      if (seen.has(feed)) continue;
+      seen.add(feed);
       try {
         const items = await loadRssFeed(feed);
         if (items.length) return items;
@@ -269,18 +309,13 @@
     const fallback = [
       { id: 'bitcoin', symbol: 'BTC', price: '$64,996.00', change: '+1.84%', up: true },
       { id: 'ethereum', symbol: 'ETH', price: '$1,884.61', change: '-0.45%', up: false },
-      { id: 'solana', symbol: 'SOL', price: '$75.52', change: '+3.21%', up: true },
-      { id: 'binancecoin', symbol: 'BNB', price: '$566.99', change: '+0.88%', up: true },
-      { id: 'ripple', symbol: 'XRP', price: '$1.11', change: '+2.07%', up: true },
-      { id: 'dogecoin', symbol: 'DOGE', price: '$0.0699', change: '-1.12%', up: false },
-      { id: 'cardano', symbol: 'ADA', price: '$0.1665', change: '+1.02%', up: true },
-      { id: 'avalanche-2', symbol: 'AVAX', price: '$6.26', change: '+2.35%', up: true }
+      { id: 'solana', symbol: 'SOL', price: '$75.52', change: '+3.21%', up: true }
     ];
 
     try {
-      const ids = COIN_SLUGS.join(',');
-      const data = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, {}, 14000);
-      items = COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map(coin => ({
+      const ids = SIDEBAR_COIN_SLUGS.join(',');
+      const data = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, {}, 20000);
+      items = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map(coin => ({
         id: coin.id || slug,
         symbol: (COIN_MAP[coin.id] || coin.symbol || '').toUpperCase(),
         price: '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -289,7 +324,7 @@
       }));
       source = items.length ? 'live' : 'fallback';
     } catch (e) {
-      console.warn('TokenWire ticker fetch failed:', e);
+      console.warn('TokenWire sidebar prices fetch failed:', e);
       items = fallback;
     }
 
@@ -297,6 +332,7 @@
     try { localStorage.setItem(TICKER_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
 
     renderTicker(items);
+    updateSidebarMarkets(items);
   }
 
   function renderTicker(items) {
