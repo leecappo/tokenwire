@@ -2,12 +2,11 @@
 (() => {
   const NEWS_CACHE_KEY = 'tw_news_cache';
   const TICKER_CACHE_KEY = 'tw_ticker_cache';
-  const NEWS_TTL_MS = 60 * 60 * 1000;
+  const NEWS_TTL_MS = 15 * 60 * 1000;
   const TICKER_TTL_MS = 5 * 60 * 1000;
 
-  const COIN_SLUGS = ['bitcoin','ethereum','solana','binancecoin','ripple','dogecoin','cardano','avalanche-2'];
   const SIDEBAR_COIN_SLUGS = ['bitcoin','ethereum','solana'];
-  const COIN_MAP = { bitcoin:'BTC', ethereum:'ETH', solana:'SOL', 'binancecoin':'BNB', ripple:'XRP', dogecoin:'DOGE', cardano:'ADA', 'avalanche-2':'AVAX' };
+  const COIN_MAP = { bitcoin:'BTC', ethereum:'ETH', solana:'SOL' };
 
   const SECTIONS = {
     topstories: document.querySelector('#topstories .topstories'),
@@ -227,7 +226,7 @@
     const items = Array.isArray(data.items) ? data.items : [];
     return items.slice(0, 40).map(it => ({
       ...tagRssItem(it),
-      source: it.source || new URL(feedUrl).hostname.replace(/^www\\./, '')
+      source: it.source || new URL(feedUrl).hostname.replace(/^www\./, '')
     }));
   }
 
@@ -235,15 +234,9 @@
     const feeds = [
       'https://cointelegraph.com/rss',
       'https://coindesk.com/arc/outboundfeeds/rss/',
-      'https://decrypt.co/feed',
-      'https://cryptopotato.com/feed/',
-      'https://www.coindesk.com/arc/outboundfeeds/rss/',
-      'https://cointelegraph.com/rss'
+      'https://decrypt.co/feed'
     ];
-    const seen = new Set();
     for (const feed of feeds) {
-      if (seen.has(feed)) continue;
-      seen.add(feed);
       try {
         const items = await loadRssFeed(feed);
         if (items.length) return items;
@@ -256,7 +249,7 @@
 
   async function loadNews() {
     let articles = [];
-    let mode = 'fallback';
+    let mode = 'loading';
     try {
       articles = await loadRssChain();
       if (articles.length) mode = 'live';
@@ -267,7 +260,7 @@
 
     if (!articles.length) {
       articles = [{
-        title: 'Live news temporarily unavailable.',
+        title: 'News temporarily unavailable - please refresh',
         url: '#',
         source: 'TokenWire',
         published_at: new Date().toISOString(),
@@ -294,7 +287,9 @@
   function updateLiveBadge(mode) {
     if (!liveBadge || !liveText) return;
     liveBadge.className = 'live-badge ' + (mode === 'live' ? 'live' : 'fallback');
-    liveText.textContent = mode === 'live' ? 'Live' : 'Fallback';
+    if (mode === 'loading') liveText.textContent = 'Loading';
+    else if (mode === 'live') liveText.textContent = 'Live';
+    else liveText.textContent = 'Fallback';
   }
 
   function setActivePill(filter) {
@@ -307,19 +302,21 @@
     let items = [];
     let source = 'fallback';
     const fallback = [
-      { id: 'bitcoin', symbol: 'BTC', price: '$64,996.00', change: '+1.84%', up: true },
-      { id: 'ethereum', symbol: 'ETH', price: '$1,884.61', change: '-0.45%', up: false },
-      { id: 'solana', symbol: 'SOL', price: '$75.52', change: '+3.21%', up: true }
+      { id: 'bitcoin', symbol: 'BTC', price: '$—', change: '—', up: true },
+      { id: 'ethereum', symbol: 'ETH', price: '$—', change: '—', up: true },
+      { id: 'solana', symbol: 'SOL', price: '$—', change: '—', up: true }
     ];
 
     try {
       const ids = SIDEBAR_COIN_SLUGS.join(',');
-      const data = await fetchWithTimeout(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, {}, 20000);
+      const proxy = 'https://corsproxy.io/?';
+      const target = 'https://api.coingecko.com/api/v3/simple/price?ids=' + ids + '&vs_currencies=usd&include_24hr_change=true';
+      const data = await fetchWithTimeout(proxy + encodeURIComponent(target), {}, 20000);
       items = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map((coin, idx) => ({
         id: coin.id || SIDEBAR_COIN_SLUGS[idx],
         symbol: (COIN_MAP[coin.id] || coin.symbol || '').toUpperCase(),
-        price: '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        change: coin.usd_24h_change != null ? (coin.usd_24h_change >= 0 ? '+' : '') + Number(coin.usd_24h_change).toFixed(2) + '%' : '0.00%',
+        price: coin.usd != null ? '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$—',
+        change: coin.usd_24h_change != null ? (coin.usd_24h_change >= 0 ? '+' : '') + Number(coin.usd_24h_change).toFixed(2) + '%' : '—',
         up: coin.usd_24h_change == null ? true : coin.usd_24h_change >= 0
       }));
       source = items.length ? 'live' : 'fallback';
