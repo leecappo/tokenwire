@@ -307,29 +307,12 @@
       { id: 'solana', symbol: 'SOL', price: '$—', change: '—', up: true }
     ];
 
-    const candidates = [
-      'https://api.allorigins.win/raw?url=',
-      'https://corsproxy.io/?'
-    ];
-
-    async function tryFetchCoinGecko() {
-      const ids = SIDEBAR_COIN_SLUGS.join(',');
-      const target = 'https://api.coingecko.com/api/v3/simple/price?ids=' + ids + '&vs_currencies=usd&include_24hr_change=true';
-      for (const prefix of candidates) {
-        try {
-          const data = await fetchWithTimeout(prefix + encodeURIComponent(target), {}, 20000);
-          const mapped = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean);
-          if (mapped.length) return mapped;
-        } catch (e) {
-          console.warn('TokenWire price source failed:', prefix, e);
-        }
-      }
-      return [];
-    }
-
     try {
-      const mapped = await tryFetchCoinGecko();
-      items = mapped.map((coin, idx) => ({
+      const ids = SIDEBAR_COIN_SLUGS.join(',');
+      const proxy = 'https://corsproxy.io/?';
+      const target = 'https://api.coingecko.com/api/v3/simple/price?ids=' + ids + '&vs_currencies=usd&include_24hr_change=true';
+      const data = await fetchWithTimeout(proxy + encodeURIComponent(target), {}, 20000);
+      items = SIDEBAR_COIN_SLUGS.map(slug => data[slug]).filter(Boolean).map((coin, idx) => ({
         id: coin.id || SIDEBAR_COIN_SLUGS[idx],
         symbol: (COIN_MAP[coin.id] || coin.symbol || '').toUpperCase(),
         price: coin.usd != null ? '$' + Number(coin.usd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$—',
